@@ -73,7 +73,12 @@ _origens_raw = os.environ.get(
 )
 ORIGENS_PERMITIDAS = [o.strip() for o in _origens_raw.split(",") if o.strip()]
 
-CORS(app, origins=ORIGENS_PERMITIDAS, supports_credentials=True)
+CORS(app,
+     origins=ORIGENS_PERMITIDAS,
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+     expose_headers=["Content-Type", "Authorization"])
 
 # ── Rate limiting (proteção contra força bruta / DDoS) ───────────
 limiter = Limiter(
@@ -1152,6 +1157,16 @@ def buscar_sigam():
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "naturatins-parecer"})
+
+
+@app.route("/auth/login", methods=["OPTIONS"])
+def login_options():
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/api/registrar-parecer", methods=["OPTIONS"])
+def registrar_options():
+    return jsonify({"status": "ok"}), 200
 
 
 # ═══════════════════════════════════════════════════════════════════
