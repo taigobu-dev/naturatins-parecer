@@ -1725,6 +1725,32 @@ async function confirmarTrocarSenha() {
 // ═══════════════════════════════════════════════════════════════
 //  INTEGRAÇÃO COM API (SIGAM / CAR) — com token JWT
 // ═══════════════════════════════════════════════════════════════
+// Re-login automático quando token expira durante busca
+async function renovarSessao() {
+    const usuario = Session.usuario;
+    if (!usuario || !usuario.email) return false;
+    // Não temos a senha salva por segurança — precisamos pedir ao usuário
+    const senha = prompt(
+        '⚠️ Sua sessão expirou durante a busca.\n\nDigite sua senha para continuar sem perder os dados preenchidos:'
+    );
+    if (!senha) return false;
+    try {
+        const r = await fetch(API_BASE + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: usuario.email, senha }),
+        });
+        const d = await r.json();
+        if (r.ok && d.token) {
+            Session.salvar(d.token, d.usuario);
+            return true;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
+
 // Fetch com timeout estendido (90s) para buscas longas no SIGAM/CAR
 async function fetchComTimeout(url, opcoes, timeoutMs=90000) {
     const controller = new AbortController();
@@ -1753,6 +1779,13 @@ async function consultarSIGAMBackend() {
             body: JSON.stringify({ano, orgao, sequencial:seq}),
         });
         if(r.status===401){
+            st.innerText='⏳ Sessão expirada. Reconectando...';
+            const renovado = await renovarSessao();
+            if (renovado) {
+                st.innerText='✅ Reconectado! Repetindo a busca...';
+                await new Promise(res => setTimeout(res, 1000));
+                return consultarSIGAMBackend(); // repete a busca com token novo
+            }
             st.innerText='❌ Sessão expirada. Faça login novamente.';
             setTimeout(() => { Session.limpar(); location.reload(); }, 2000);
             return;
@@ -1790,6 +1823,13 @@ async function consultarCARBackend() {
             body: JSON.stringify({car}),
         });
         if(r.status===401){
+            st.innerText='⏳ Sessão expirada. Reconectando...';
+            const renovado = await renovarSessao();
+            if (renovado) {
+                st.innerText='✅ Reconectado! Repetindo a busca...';
+                await new Promise(res => setTimeout(res, 1000));
+                return consultarCARBackend();
+            }
             st.innerText='❌ Sessão expirada. Faça login novamente.';
             setTimeout(() => { Session.limpar(); location.reload(); }, 2000);
             return;
