@@ -1,0 +1,2498 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Parecer Técnico - Naturatins</title>
+    <style>
+        /* ===================== TELA ===================== */
+        :root {
+            --primary: #1a5c1e;
+            --secondary: #1565c0;
+            --accent: #e8f5e9;
+            --border: #b0bec5;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #eceff1; padding: 20px; color: #263238; margin: 0; }
+
+        /* FORM */
+        #form-container {
+            max-width: 960px; margin: 0 auto; background: white;
+            padding: 32px; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.12);
+        }
+        .logo-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+        .logo-header img { height: 52px; }
+        .logo-header h1 { font-size: 20px; color: var(--primary); margin: 0; }
+        .logo-header p { margin: 2px 0 0; font-size: 12px; color: #546e7a; }
+
+        h2 { color: var(--primary); font-size: 15px; text-transform: uppercase;
+             letter-spacing: .5px; border-left: 4px solid var(--primary);
+             padding: 6px 0 6px 12px; background: var(--accent); border-radius: 0 4px 4px 0;
+             margin: 28px 0 14px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .form-group { margin-bottom: 10px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 12.5px; color: #37474f; }
+        input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+                        border-radius: 5px; font-size: 13.5px; background: #fff; }
+        input[readonly] { background: #f5f5f5; color: #546e7a; }
+        select { cursor: pointer; }
+
+        .search-box { background: #e3f2fd; padding: 16px; border-radius: 8px;
+                      border-left: 4px solid var(--secondary); margin-bottom: 18px; }
+        .search-box-sigam { background: #e0f7fa; padding: 16px; border-radius: 8px;
+                            border-left: 4px solid #00838f; margin-bottom: 18px; }
+        .search-box label, .search-box-sigam label { font-size: 13px; font-weight: 700; color: #1565c0; }
+        .search-row { display: flex; gap: 8px; align-items: flex-end; }
+        .search-row input { flex: 1; }
+        .btn-search { background: var(--secondary); color: white; border: none;
+                      padding: 9px 18px; border-radius: 5px; cursor: pointer;
+                      font-weight: 700; font-size: 13px; white-space: nowrap; }
+        .btn-search-sigam { background: #00838f; color: white; border: none;
+                            padding: 9px 18px; border-radius: 5px; cursor: pointer;
+                            font-weight: 700; font-size: 13px; white-space: nowrap; }
+        small { display: block; margin-top: 6px; font-size: 12px; font-weight: 700; }
+
+        .conditional { background: #f1f8e9; padding: 12px; border-radius: 5px;
+                        margin-top: 8px; border-left: 3px solid var(--primary); }
+        .hidden { display: none !important; }
+
+        .btn-gerar { background: var(--primary); color: white; border: none;
+                     padding: 14px 30px; border-radius: 6px; cursor: pointer;
+                     font-weight: 700; font-size: 15px; width: 100%; margin-top: 24px;
+                     transition: background .2s; letter-spacing: .5px; }
+        .btn-gerar:hover { background: #0d3e10; }
+
+        /* ===================== IMPRESSÃO ===================== */
+        @media screen {
+            #pdf-content { display: none; }
+        }
+
+        @media print {
+            @page { size: A4; margin: 15mm 20mm 20mm 20mm; }
+            body { background: white; padding: 0; margin: 0; color: #000; }
+            #form-container { display: none; }
+            #pdf-content { display: block; font-family: Arial, sans-serif; font-size: 9.5pt; color: #000; }
+
+            .doc-header { text-align: center; margin-bottom: 14pt; }
+            .doc-header .naturatins-logo { font-size: 7.5pt; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 6pt; margin-bottom: 8pt; }
+            .doc-header .parecer-title { font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+            .doc-header .parecer-date { font-size: 9pt; margin: 3pt 0 0; }
+
+            /* Caixas de seção */
+            .section-box { border: 1px solid #444; margin-bottom: 6pt; }
+            .section-box.no-break { page-break-inside: avoid; break-inside: avoid; }
+            .section-box .section-title {
+                background: #1a5c1e; color: white; font-size: 9pt; font-weight: bold;
+                padding: 3pt 6pt; text-transform: uppercase; letter-spacing: .5px;
+            }
+            .section-box .section-body { padding: 5pt 7pt; }
+
+            /* Tabela de dados gerais */
+            .dados-table { width: 100%; border-collapse: collapse; }
+            .dados-table td { padding: 2.5pt 5pt; font-size: 9pt; vertical-align: top; }
+            .dados-table .lbl { font-weight: bold; width: 30%; }
+            .dados-table tr td:first-child { border-right: 1px solid #ddd; }
+
+            /* Tabela de áreas */
+            .areas-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+            .areas-table th { background: #2e7d32; color: white; padding: 3pt 5pt; text-align: center; border: 1px solid #1a5c1e; font-size: 8pt; }
+            .areas-table td { padding: 2.5pt 5pt; border: 1px solid #ccc; text-align: center; }
+            .areas-table tr:nth-child(even) td { background: #f1f8e9; }
+            .areas-table .total-row td { background: #e8f5e9; font-weight: bold; }
+
+            /* Tabela de cálculo RL */
+            .calc-table { width: 100%; border-collapse: collapse; font-size: 8pt; margin: 4pt 0; }
+            .calc-table th { background: #1565c0; color: white; padding: 2.5pt 5pt; border: 1px solid #0d47a1; text-align: left; }
+            .calc-table td { padding: 2.5pt 5pt; border: 1px solid #ccc; font-size: 8pt; }
+            .calc-table .total-row td { background: #e3f2fd; font-weight: bold; }
+
+            /* Tabela de volumes */
+            .vol-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin: 4pt 0; }
+            .vol-table th { background: #424242; color: white; padding: 2.5pt 6pt; border: 1px solid #212121; text-align: center; }
+            .vol-table td { padding: 2pt 6pt; border: 1px solid #ccc; text-align: center; }
+            .vol-table tr:nth-child(even) td { background: #f5f5f5; }
+
+            /* Texto corrido */
+            .body-text { font-size: 9pt; text-align: justify; margin: 4pt 0; line-height: 1.45; }
+            .body-text p { margin: 3pt 0; }
+            .indent { margin-left: 10pt; }
+
+            /* Bulletins */
+            .bullet-list { margin: 3pt 0 3pt 14pt; padding: 0; }
+            .bullet-list li { margin-bottom: 2pt; font-size: 9pt; }
+
+            .sub-section { font-weight: bold; margin: 6pt 0 2pt; font-size: 9pt; text-transform: uppercase; }
+            .sub-section-minor { font-weight: bold; margin: 5pt 0 2pt; font-size: 9pt; }
+
+            /* Condicionantes e recomendações */
+            .cond-box { border: 1px solid #888; padding: 5pt 7pt; font-size: 8.5pt; margin-bottom: 4pt; }
+            .cond-box p { margin: 2pt 0; text-align: justify; }
+
+            /* Pendências */
+            .pend-box { border: 2px solid #c62828; padding: 5pt 7pt; font-size: 8.5pt; margin: 4pt 0;
+                        page-break-inside: avoid; break-inside: avoid; }
+            .pend-box .pend-title { font-weight: bold; color: #c62828; margin-bottom: 3pt; }
+            .pend-box p { margin: 2pt 0; text-align: justify; white-space: pre-wrap; word-wrap: break-word; }
+
+            /* Conclusão */
+            .conclusao-box { border: 2px solid #1a5c1e; padding: 6pt 8pt; font-size: 9.5pt; text-align: justify;
+                             page-break-inside: avoid; break-inside: avoid; }
+
+            /* Assinatura */
+            .assinatura { margin-top: 30pt; text-align: center; font-size: 9pt; }
+            .assinatura .linha { border-top: 1px solid #000; width: 60%; margin: 0 auto 4pt; }
+
+            .page-break { page-break-before: always; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!--                      FORMULÁRIO                             -->
+<!-- ============================================================ -->
+<div id="form-container">
+
+    <div class="logo-header">
+        <div>
+            <h1>🌿 Gerador de Parecer Técnico</h1>
+            <p>Instituto Natureza do Tocantins – NATURATINS</p>
+        </div>
+    </div>
+
+    <!-- SIGAM -->
+    <div class="search-box-sigam">
+        <label>🔍 Buscar Dados do Processo (SIGAM):</label>
+        <div class="search-row" style="margin-top:8px;">
+            <input type="text" id="sigam_ano" placeholder="Ano" style="width:18%;">
+            <input type="text" id="sigam_orgao" placeholder="Órgão" style="width:18%;">
+            <input type="text" id="sigam_seq" placeholder="Nº Sequencial" style="width:36%;">
+            <button class="btn-search-sigam" onclick="consultarSIGAMBackend()">Buscar SIGAM</button>
+        </div>
+        <small id="status_busca_sigam" style="color:#00838f;"></small>
+    </div>
+
+    <h2>Dados do Processo e Requerente</h2>
+    <div class="grid-2">
+        <div class="form-group"><label>Nº do Processo (SIGAM):</label><input type="text" id="num_processo" placeholder="ex: 2025/40311/006805"></div>
+        <div class="form-group"><label>Nº do Requerimento (SIGAM):</label><input type="text" id="num_requerimento" placeholder="ex: 12454/2025"></div>
+        <div class="form-group"><label>Nº do Parecer:</label><input type="text" id="num_parecer" placeholder="ex: 0164-2026"></div>
+        <div class="form-group"><label>Data do Parecer:</label><input type="date" id="data_parecer"></div>
+        <div class="form-group"><label>Nome do Requerente:</label><input type="text" id="nome_requerente"></div>
+        <div class="form-group"><label>CPF/CNPJ do Requerente:</label><input type="text" id="cpf_requerente"></div>
+        <div class="form-group"><label>Atividade:</label>
+            <select id="atividade">
+                <option value="">Selecione...</option>
+                <option value="Barramento">Barramento</option>
+                <option value="Pecuária">Pecuária</option>
+                <option value="Agricultura">Agricultura</option>
+                <option value="Silvicultura">Silvicultura</option>
+                <option value="Obras Civis Não Lineares">Obras Civis Não Lineares</option>
+                <option value="Obras Civis Lineares">Obras Civis Lineares</option>
+                <option value="Loteamento">Loteamento</option>
+                <option value="Mineração">Mineração</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Responsável Técnico:</label><input type="text" id="resp_tecnico"></div>
+        <div class="form-group"><label>CPF/CNPJ Resp. Técnico:</label><input type="text" id="cpf_resp_tecnico"></div>
+        <div class="form-group"><label>Título Profissional:</label><input type="text" id="titulo_prof" placeholder="ex: Eng. Agrônomo"></div>
+        <div class="form-group"><label>ART / Registro:</label><input type="text" id="art_resp_tecnico" placeholder="ex: TO20250558061"></div>
+        <div class="form-group"><label>E-mail Resp. Técnico:</label><input type="text" id="email_resp"></div>
+        <div class="form-group"><label>Telefone Resp. Técnico:</label><input type="text" id="tel_resp"></div>
+        <div class="form-group"><label>Denominação do Imóvel:</label><input type="text" id="nome_imovel" placeholder="ex: FAZENDA SANTOS REIS (M-1552)"></div>
+    </div>
+
+    <h2>Dados do Imóvel – CAR / SIGCAR</h2>
+    <div class="search-box">
+        <label>🔍 Número do CAR para busca automática (SIGCAR):</label>
+        <div class="search-row" style="margin-top:8px;">
+            <input type="text" id="q5_num" placeholder="Ex: TO-1234567-...">
+            <button class="btn-search" onclick="consultarCARBackend()">Buscar CAR</button>
+        </div>
+        <small id="status_busca" style="color:var(--secondary);"></small>
+    </div>
+
+    <div class="grid-2">
+        <div class="form-group"><label>Município:</label><input type="text" id="q2" placeholder="Preenchido automaticamente..." readonly></div>
+        <div class="form-group"><label>Status do CAR:</label><input type="text" id="status_car_input" readonly></div>
+        <div class="form-group"><label>Data de inscrição no SIGCAR:</label><input type="text" id="data_sigcar" placeholder="ex: 17/02/2023 às 11h:36min"></div>
+        <div class="form-group"><label>Adesão ao PRA:</label>
+            <select id="adesao_pra"><option>Não</option><option>Sim</option></select>
+        </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:4px;">
+        <div class="form-group"><label>Área Escriturada (ha):</label><input type="number" step="0.0001" id="area_escriturada"></div>
+        <div class="form-group"><label>Área Vetorizada (ha):</label><input type="number" step="0.0001" id="area_vetorizada"></div>
+        <div class="form-group"><label>Área Líquida (ha):</label><input type="number" step="0.0001" id="area_liquida"></div>
+        <div class="form-group"><label>Remanescente Veg. Nativa (ha):</label><input type="number" step="0.0001" id="area_remanescente"></div>
+        <div class="form-group"><label>Área de Pousio (ha):</label><input type="number" step="0.0001" id="area_pousio"></div>
+        <div class="form-group"><label>Área Consolidada (ha):</label><input type="number" step="0.0001" id="area_consolidada"></div>
+        <div class="form-group"><label>Área Antropizada &gt; 22/07/2008 (ha):</label><input type="number" step="0.0001" id="area_antropizada"></div>
+        <div class="form-group"><label>Uso Alternativo (AUA) (ha):</label><input type="number" step="0.0001" id="area_uso_alternativo"></div>
+        <div class="form-group"><label>Infra. Pública (ha):</label><input type="number" step="0.0001" id="area_infra_publica"></div>
+        <div class="form-group"><label>Utilidade Pública (ha):</label><input type="number" step="0.0001" id="area_utilidade_publica"></div>
+        <div class="form-group"><label>Servidão Administrativa (ha):</label><input type="number" step="0.0001" id="area_servidao"></div>
+        <div class="form-group"><label>Área de APP (ha):</label><input type="number" step="0.0001" id="area_app"></div>
+        <div class="form-group"><label>APP art. 61-A (ha):</label><input type="number" step="0.0001" id="area_app_61a"></div>
+        <div class="form-group"><label>APP a Recuperar (ha):</label><input type="number" step="0.0001" id="area_app_recuperar"></div>
+        <div class="form-group"><label>Reserva Legal Proposta (ha):</label><input type="number" step="0.0001" id="area_rl"></div>
+        <div class="form-group"><label>Reserva Legal Proposta (% área líquida):</label><input type="text" id="area_rl_pct" readonly></div>
+        <div class="form-group"><label>RL Suplementar (ha):</label><input type="number" step="0.0001" id="area_rl_suplementar"></div>
+        <div class="form-group"><label>Reserva Legal Total (ha):</label><input type="number" step="0.0001" id="area_rl_total"></div>
+        <div class="form-group"><label>RL a Recuperar (ha):</label><input type="number" step="0.0001" id="area_rl_recuperar"></div>
+        <div class="form-group"><label>ARL com Vegetação (ha):</label><input type="number" step="0.0001" id="area_arl_veg"></div>
+    </div>
+
+    <h2>Área Requerida e Bioma</h2>
+    <div class="grid-2">
+        <div class="form-group"><label>Área Solicitada para Desmatamento (ARD) (ha):</label><input type="number" step="0.0001" id="area_ard"></div>
+        
+        <div class="form-group"><label>Bioma:</label>
+            <select id="q6">
+                <option value="Cerrado">Cerrado</option>
+                <option value="Floresta">Floresta</option>
+                <option value="Cerrado e Floresta">Cerrado e Floresta</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Coordenadas ARD (Lat./Long.):</label><input type="text" id="coord_ard" placeholder="ex: 11°37'35,08&quot; S e 47°45'54,31&quot; O"></div>
+    </div>
+
+    <h2>Análise Documental</h2>
+
+  
+
+    <div class="form-group">
+        <label>1. Recibo de inscrição do imóvel no Cadastro Ambiental Rural (CAR):</label>
+        <select id="doc_car" onchange="toggleDocPend('doc_car_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_car_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_car_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>2. Croqui de acesso ao imóvel (arquivo digital formato kml):</label>
+        <select id="doc_croqui" onchange="toggleDocPend('doc_croqui_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_croqui_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_croqui_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>3. Certidão de inteiro teor (atualizada até 30 dias) / documentação de posse:</label>
+        <select id="doc_cert" onchange="toggleDocPend('doc_cert_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_cert_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_cert_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>4. Documentos pessoais (Pessoa Física) ou Contrato social / IE (Pessoa Jurídica):</label>
+        <select id="doc_pes" onchange="toggleDocPend('doc_pes_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_pes_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_pes_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>5. Procuração (se for o caso):</label>
+        <select id="doc_proc" onchange="toggleDocPend('doc_proc_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_proc_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_proc_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>6. Projeto de Exploração Florestal (PEF) + Inventário Florestal – conforme Termo de Referência NATURATINS:</label>
+        <select id="doc_pef" onchange="toggleDocPend('doc_pef_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_pef_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_pef_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>7. Arquivo digital shapefile (compactado em "rar") – SIRGAS 2000, incluindo área a explorar e unidades amostrais:</label>
+        <select id="doc_shape" onchange="toggleDocPend('doc_shape_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_shape_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_shape_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>8. ART assinada pelo Responsável Técnico para Inventário Florestal e PEF:</label>
+        <select id="doc_art" onchange="toggleDocPend('doc_art_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_art_pend" class="hidden conditional">
+            <label>Descreva a pendência/obs.:</label>
+            <textarea id="doc_art_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva o que está faltando ou incompleto..."></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>9. Licença Prévia da Atividade:</label>
+        <select id="doc_licenca" onchange="toggleDocPend('doc_licenca_pend',this.value)">
+            <option value="SIM">SIM</option><option value="NÃO">NÃO</option><option value="PARCIAL">PARCIAL</option>
+        </select>
+        <div id="doc_licenca_pend" class="hidden conditional">
+            <label>Descreva a situação da licença:</label>
+            <textarea id="doc_licenca_desc" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;resize:vertical;" placeholder="Descreva a situação da licença..."></textarea>
+        </div>
+    </div>
+
+    <h2>Análise Técnica</h2>
+
+    <div class="form-group">
+        <label>1. Imóvel sobreposto a Terra Indígena (TI)?</label>
+        <select id="tem_ti" onchange="toggleShow('div_opcoes_ti', this.value==='Sim')">
+            <option value="Não">Não</option><option value="Sim">Sim</option>
+        </select>
+    </div>
+    <div class="form-group hidden conditional" id="div_opcoes_ti">
+        <label>Selecione a Terra Indígena:</label>
+        <select id="sobreposicao_ti">
+            <option value="">Selecione...</option>
+            <option>Apinayé</option><option>Boto Velho</option><option>Cacique Fontoura</option>
+            <option>Funil</option><option>Inawebohona</option><option>Krahó-Kanela</option>
+            <option>Kraolandia (Krahô)</option><option>Parque do Araguaia</option>
+            <option>Utaria Wyhyna/Iròdu Iràna</option><option>Xambioá</option>
+            <option>Xerente</option><option>Outra TI</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>4. Imóvel sobreposto a Unidade de Conservação (UC)?</label>
+        <select id="tem_uc" onchange="toggleShow('div_opcoes_uc', this.value==='Sim')">
+            <option value="Não">Não</option><option value="Sim">Sim</option>
+        </select>
+    </div>
+    <div class="form-group hidden conditional" id="div_opcoes_uc">
+        <label>Selecione a Unidade de Conservação:</label>
+        <select id="sobreposicao_uc">
+            <option value="">Selecione...</option>
+            <optgroup label="Parques e Monumentos">
+                <option>Parque Estadual do Cantão</option><option>Parque Estadual do Jalapão</option>
+                <option>Parque Estadual do Lajeado</option><option>Parque Nacional do Araguaia</option>
+                <option>Parque Nac. das Nascentes do Rio Parnaíba</option>
+                <option>Monumento Natural das Árvores Fossilizadas</option>
+            </optgroup>
+            <optgroup label="Áreas de Proteção Ambiental (APA)">
+                <option>APA Ilha do Bananal/Cantão</option><option>APA do Jalapão</option>
+                <option>APA Serra do Lajeado</option><option>APA Lago de Palmas</option>
+                <option>APA Lago de Peixe/Angical</option><option>APA Nascentes de Araguaína</option>
+            </optgroup>
+            <option>Outra UC (Federal/Estadual/Municipal)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>5. Imóvel sobreposto a Área Quilombola?</label>
+        <select id="tem_quilombola" onchange="toggleShow('div_opcoes_quilombola', this.value==='Sim')">
+            <option value="Não">Não</option><option value="Sim">Sim</option>
+        </select>
+    </div>
+    <div class="form-group hidden conditional" id="div_opcoes_quilombola">
+        <label>Selecione a Comunidade Quilombola:</label>
+        <select id="sobreposicao_quilombola">
+            <option value="">Selecione...</option>
+            <option>Baião (Almas)</option><option>Barra da Aroeira (Santa Tereza do TO)</option>
+            <option>Cocalinho (Santa Fé do Araguaia)</option><option>Curralinho do Pontal (Brejinho de Nazaré)</option>
+            <option>Grotão (Filadélfia)</option><option>Kalunga do Mimoso (Arraias)</option>
+            <option>Lagoa da Pedra (Arraias)</option><option>Lagoa dos Patos (Arraias)</option>
+            <option>Mata Grande (Monte do Carmo)</option><option>Morro de São João (Santa Rosa do TO)</option>
+            <option>Mumbuca (Mateiros)</option><option>Redenção (Natividade)</option>
+            <option>São José (Chapada da Natividade)</option><option>Outra Comunidade Quilombola</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>6. Reserva Legal em conformidade com o Código Florestal?</label>
+        <select id="q10"><option value="SIM">SIM</option><option value="NÃO">NÃO</option></select>
+    </div>
+
+    <div class="grid-2">
+        <div class="form-group">
+            <label>7. Desmatamento mecanizado com destoca?</label>
+            <select id="q13"><option value="SIM">SIM</option><option value="NÃO">NÃO</option></select>
+        </div>
+        <div class="form-group">
+            <label>7.1. Tipo de supressão:</label>
+            <select id="q13_1">
+                <option value="ACAIO">ACAIO</option><option value="ACAIM">ACAIM</option>
+                <option value="AEF">AEF</option><option value="AEFS">AEFS</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>8. Supressão de espécies protegidas por Lei?</label>
+        <select id="q14"><option value="NÃO">NÃO</option><option value="SIM – Com supressão">SIM</option></select>
+    </div>
+
+    <div class="form-group">
+        <label>9. Amostras do inventário suficientes?</label>
+        <select id="q15"><option value="SIM">SIM</option><option value="NÃO">NÃO</option></select>
+    </div>
+
+    <div class="form-group">
+        <label>10. Vistoria técnica presencial realizada?</label>
+        <select id="q16" onchange="toggle('q16_extra', this.value==='SIM')">
+            <option value="NÃO">NÃO – Dispensada (ARD &lt; 4 módulos fiscais)</option>
+            <option value="SIM">SIM</option>
+        </select>
+        <div id="q16_extra" class="hidden conditional">
+            <label>Nº e Resultado do Relatório Técnico:</label>
+            <input type="text" id="q16_num" placeholder="Ex: 309-2024 (Favorável)">
+        </div>
+    </div>
+
+    <!-- ── IMPORTAÇÃO AUTOMÁTICA DE INVENTÁRIO (AEF) ─────────────────────── -->
+    <div id="box-import" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #16a34a;border-radius:12px;padding:20px 22px;margin-bottom:22px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+            <span style="font-size:28px;">🌲</span>
+            <div>
+                <div style="font-weight:800;font-size:15px;color:#15803d;">Importar Inventário Florestal (Excel)</div>
+                <div style="font-size:12px;color:#666;margin-top:3px;">Carregue o arquivo <strong>.xlsx</strong> ou <strong>.xls</strong> — todos os campos de Inventário e Volumetria serão preenchidos automaticamente.</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:220px;">
+                <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Arquivo Excel:</label>
+                <input type="file" id="imp_file" accept=".xlsx,.xls"
+                    style="width:100%;padding:7px 10px;border:1px solid #bbf7d0;border-radius:6px;font-size:13px;background:#fff;cursor:pointer;">
+            </div>
+            <button onclick="importarInventario()"
+                style="background:#15803d;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 2px 8px rgba(21,128,61,.35);">
+                📥 Processar e Preencher
+            </button>
+        </div>
+        <div id="imp_status" style="margin-top:10px;font-size:12.5px;font-weight:700;min-height:16px;"></div>
+        <div id="imp_resultado" style="display:none;margin-top:14px;">
+            <div style="background:#14532d;border-radius:10px;padding:16px;color:#fff;margin-bottom:12px;">
+                <div style="font-size:11px;font-weight:800;color:#86efac;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">✅ Dados Extraídos</div>
+                <div id="imp_cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;"></div>
+            </div>
+            <div id="imp_ok" style="text-align:center;font-size:13px;font-weight:700;color:#15803d;margin-top:6px;display:none;">✅ Formulário preenchido com sucesso!</div>
+        </div>
+    </div>
+
+    <!-- ── IMPORTAÇÃO AUTOMÁTICA DE CENSO (ACAIO/ACAIM/AEFS) — SÓ VOLUMETRIA ─────── -->
+    <div id="box-import-censo" style="display:none;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #2563eb;border-radius:12px;padding:20px 22px;margin-bottom:22px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+            <span style="font-size:28px;">📊</span>
+            <div>
+                <div style="font-weight:800;font-size:15px;color:#1d4ed8;">Importar Planilha de Censo (Excel) — Somente Volumetria</div>
+                <div style="font-size:12px;color:#666;margin-top:3px;">Carregue a planilha <strong>.xlsx</strong> ou <strong>.xls</strong> do censo arbóreo — serão preenchidos automaticamente apenas os volumes de <strong>Lenha (m³ e st)</strong>, <strong>Lapidados</strong> e <strong>Tora/Serraria</strong>.</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:220px;">
+                <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Arquivo Excel:</label>
+                <input type="file" id="imp_file_censo" accept=".xlsx,.xls"
+                    style="width:100%;padding:7px 10px;border:1px solid #bfdbfe;border-radius:6px;font-size:13px;background:#fff;cursor:pointer;">
+            </div>
+            <button onclick="importarVolumetriaCenso()"
+                style="background:#1d4ed8;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 2px 8px rgba(29,78,216,.35);">
+                📥 Processar Volumetria
+            </button>
+        </div>
+        <div id="imp_status_censo" style="margin-top:10px;font-size:12.5px;font-weight:700;min-height:16px;"></div>
+        <div id="imp_resultado_censo" style="display:none;margin-top:14px;">
+            <div style="background:#1e3a8a;border-radius:10px;padding:16px;color:#fff;margin-bottom:12px;">
+                <div style="font-size:11px;font-weight:800;color:#93c5fd;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">✅ Volumetria Extraída</div>
+                <div id="imp_cards_censo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;"></div>
+            </div>
+            <div id="imp_ok_censo" style="text-align:center;font-size:13px;font-weight:700;color:#1d4ed8;margin-top:6px;display:none;">✅ Volumetria preenchida com sucesso!</div>
+        </div>
+    </div>
+
+    <div id="section-inventario">
+    <h2>Dados do Inventário Florestal</h2>
+    <div class="grid-3">
+        <div class="form-group">
+            <label>Processo de Amostragem:</label>
+            <select id="inv_amostragem" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;background:#fff;">
+                <option value="">— Selecione —</option>
+                <option value="EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 2 ESTRATOS">EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 2 ESTRATOS</option>
+                <option value="EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 3 ESTRATOS">EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 3 ESTRATOS</option>
+                <option value="EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 4 ESTRATOS">EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 4 ESTRATOS</option>
+                <option value="EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 5 ESTRATOS">EUCALIPTO - AMOSTRAGEM ESTRATIFICADA - 5 ESTRATOS</option>
+                <option value="EUCALIPTO - AMOSTRAGEM SISTEMATICA">EUCALIPTO - AMOSTRAGEM SISTEMATICA</option>
+                <option value="NATIVO - AMOSTRAGEM ESTRATIFICADA - 2 ESTRATOS">NATIVO - AMOSTRAGEM ESTRATIFICADA - 2 ESTRATOS</option>
+                <option value="NATIVO - AMOSTRAGEM ESTRATIFICADA - 3 ESTRATOS">NATIVO - AMOSTRAGEM ESTRATIFICADA - 3 ESTRATOS</option>
+                <option value="NATIVO - AMOSTRAGEM ESTRATIFICADA - 4 ESTRATOS">NATIVO - AMOSTRAGEM ESTRATIFICADA - 4 ESTRATOS</option>
+                <option value="NATIVO - AMOSTRAGEM ESTRATIFICADA - 5 ESTRATOS">NATIVO - AMOSTRAGEM ESTRATIFICADA - 5 ESTRATOS</option>
+                <option value="NATIVO - AMOSTRAGEM SISTEMATICA">NATIVO - AMOSTRAGEM SISTEMATICA</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Qtde. Amostras Exigidas:</label><input type="number" id="inv_qtd_exig"></div>
+        <div class="form-group"><label>Qtde. Amostras Lançadas:</label><input type="number" id="inv_qtd_lanc"></div>
+        <div class="form-group"><label>Tamanho das Amostras:</label><input type="text" id="inv_tam" placeholder="ex: 0,05 ha (10x50 m)"></div>
+        <div class="form-group"><label>Área Amostrada (ha):</label><input type="number" step="0.001" id="inv_area_amostrada"></div>
+        <div class="form-group"><label>Intens. Amostral Necessária (%):</label><input type="number" step="0.01" id="inv_int_nec"></div>
+        <div class="form-group"><label>Intens. Amostral Realizada (%):</label><input type="number" step="0.01" id="inv_int_real"></div>
+        <div class="form-group"><label>Coef. de Variação (±%):</label><input type="number" step="0.01" id="inv_cv"></div>
+        <div class="form-group"><label>Volume por Hectare (m³/ha):</label><input type="number" step="0.0001" id="inv_vol_ha"></div>
+        <div class="form-group"><label>Erro de Amostragem Relativo (%):</label><input type="number" step="0.01" id="inv_erro"></div>
+    </div>
+    </div>
+
+    <h2>Volumetria</h2>
+    <div class="grid-3">
+        <div class="form-group"><label>Volume LENHA (m³):</label><input type="number" step="0.0001" id="vol_lenha_m3"></div>
+        <div class="form-group"><label>Volume LENHA (st):</label><input type="number" step="0.0001" id="vol_lenha_st"></div>
+        <div class="form-group"><label>Volume LAPIDADOS (m³):</label><input type="number" step="0.0001" id="vol_lap_m3"></div>
+        <div class="form-group"><label>Volume TORA/SERRARIA (m³) – se houver:</label><input type="number" step="0.0001" id="vol_tora_m3" placeholder="0 se não houver"></div>
+    </div>
+
+    <h2>Forma de Reposição Florestal</h2>
+    <div class="form-group">
+        <select id="reposicao_tipo">
+            <option value="vender">Passar/vender para outro CPF (responsável pela quitação)</option>
+            <option value="terceiros">Aquisição de reposição florestal de terceiros</option>
+            <option value="outro">Outro</option>
+        </select>
+    </div>
+
+    <h2>Conclusão</h2>
+    <div class="form-group">
+        <label>12. Conclusão Final do Parecer:</label>
+        <select id="q17" onchange="toggle('q17_motivo', this.value==='DESFAVORAVELMENTE')"><option value="FAVORAVELMENTE">FAVORÁVEL</option><option value="DESFAVORAVELMENTE">DESFAVORÁVEL</option></select>
+        <div id="q17_motivo" class="hidden conditional" style="border-left-color:#c62828;">
+            <label style="color:#c62828;">Descreva o(s) motivo(s) do parecer desfavorável:</label>
+            <div id="pend-lista" style="border:1px solid #c62828;border-radius:5px;padding:6px 8px;background:#fff;min-height:80px;"></div>
+            <small style="color:#c62828;font-weight:600;">&#8629; Enter para nova pendência numerada &nbsp;|&nbsp; Backspace na linha vazia para remover</small>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Analista Responsável pelo Parecer:</label>
+        <input type="text" id="analista_nome" placeholder="Nome completo do analista">
+    </div>
+    
+
+    <button class="btn-gerar" onclick="gerarParecer()">📄 Gerar Parecer para Impressão</button>
+</div>
+
+<!-- ============================================================ -->
+<!--                    DOCUMENTO IMPRESSO                       -->
+<!-- ============================================================ -->
+<div id="pdf-content"></div>
+
+<script>
+// ─── Helpers ───────────────────────────────────────────────────
+function v(id){ return (document.getElementById(id)||{}).value||''; }
+function n(id){ return parseFloat(v(id))||0; }
+function fmt(num){ return num ? num.toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4}) : '0,0000'; }
+function pct(part,total){ return total ? (part/total*100).toFixed(2).replace('.',',')+'%' : '–'; }
+function toggle(id, show){
+    document.getElementById(id).classList.toggle('hidden', !show);
+    if(show && id === 'q17_motivo') initPendLista();
+}
+function toggleShow(id, show){ document.getElementById(id).classList.toggle('hidden', !show); }
+
+// ─── Pendências com numeração automática ──────
+function initPendLista(){
+    const lista = document.getElementById('pend-lista');
+    if(lista.children.length === 0) addPendItem(lista, 1, '');
+}
+
+function addPendItem(lista, num, texto){
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;';
+
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'min-width:22px;font-weight:700;font-size:13.5px;color:#c62828;padding-top:6px;';
+    lbl.textContent = num + '.';
+
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = texto;
+    inp.style.cssText = 'flex:1;padding:6px 8px;border:1px solid #e0a0a0;border-radius:4px;font-size:13.5px;';
+    inp.placeholder = 'Descreva a pendência ' + num + '...';
+
+    inp.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){
+            e.preventDefault();
+            const rows = Array.from(lista.children);
+            const idx = rows.indexOf(row);
+            addPendItem(lista, rows.length + 1, '');
+            renumPend(lista);
+            setTimeout(()=>{ lista.children[idx+1].querySelector('input').focus(); }, 0);
+        } else if(e.key === 'Backspace' && inp.value === ''){
+            e.preventDefault();
+            const rows = Array.from(lista.children);
+            if(rows.length > 1){
+                const idx = rows.indexOf(row);
+                lista.removeChild(row);
+                renumPend(lista);
+                const prev = lista.children[Math.max(0, idx-1)];
+                if(prev) prev.querySelector('input').focus();
+            }
+        }
+    });
+
+    row.appendChild(lbl);
+    row.appendChild(inp);
+    lista.appendChild(row);
+    inp.focus();
+}
+
+function renumPend(lista){
+    Array.from(lista.children).forEach((row, i) => {
+        const lbl = row.querySelector('span');
+        const inp = row.querySelector('input');
+        if(lbl) lbl.textContent = (i+1) + '.';
+        if(inp) inp.placeholder = 'Descreva a pendência ' + (i+1) + '...';
+    });
+}
+
+function getPendTexto(){
+    const lista = document.getElementById('pend-lista');
+    if(!lista) return '';
+    return Array.from(lista.querySelectorAll('input'))
+        .map((inp, i) => inp.value.trim() ? (i+1) + '. ' + inp.value.trim() : '')
+        .filter(Boolean)
+        .join('\n');
+}
+
+function dataFormatada(dateStr){
+    if(!dateStr) return '___/___/______';
+    const [y,m,d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+// ─── Backend API ───────────────────────────────────────────────
+async function consultarSIGAMBackend(){
+    const ano=v('sigam_ano'), orgao=v('sigam_orgao'), seq=v('sigam_seq');
+    const st=document.getElementById('status_busca_sigam');
+    if(!ano||!orgao||!seq){alert('Preencha Ano, Órgão e Sequencial.');return;}
+    st.innerText='⏳ Acessando SIGAM → abrindo documentos juntados → lendo último requerimento... aguarde (~40s).';
+    try{
+        const r=await fetch('http://127.0.0.1:3000/api/buscar-sigam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ano,orgao,sequencial:seq})});
+        const d=await r.json();
+        if(d.sucesso){
+            const p=(id,val)=>{const c=document.getElementById(id);if(c&&val)c.value=val;};
+            p('num_processo',     d.numero_processo);
+            // Preenche número do requerimento: prefere o extraído do documento
+            if(d.num_requerimento_doc) p('num_requerimento', d.num_requerimento_doc);
+            else if(d.numero_requerimento) p('num_requerimento', d.numero_requerimento);
+            p('resp_tecnico',     d.resp_tecnico_nome);
+            p('cpf_resp_tecnico', d.resp_tecnico_cpf);
+            p('email_resp',       d.resp_tecnico_email);
+            p('tel_resp',         d.resp_tecnico_tel);
+            p('titulo_prof',      d.resp_tecnico_formacao);
+            p('art_resp_tecnico', d.resp_tecnico_registro);
+            // Preenche requerente com dados do documento se ainda estiver vazio
+            if(d.nome_requerente_doc) p('nome_requerente', d.nome_requerente_doc);
+            if(d.cpf_requerente_doc)  p('cpf_requerente',  d.cpf_requerente_doc);
+            const preenchidos=[
+                d.resp_tecnico_nome  ?'Resp. Técnico':'',
+                d.resp_tecnico_cpf   ?'CPF':'',
+                d.resp_tecnico_email ?'E-mail':'',
+                d.resp_tecnico_tel   ?'Telefone':'',
+            ].filter(Boolean).join(', ');
+            const reqInfo = d.numero_requerimento ? ' | Req: '+d.numero_requerimento : '';
+            st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' RT: '+preenchidos+'.':' ⚠️ RT não localizado no último requerimento.');
+        }else{ st.innerText='❌ Erro: '+d.mensagem; }
+    }catch(e){ st.innerText='❌ Erro de conexão: o servidor Python está ligado?'; }
+}
+
+async function consultarCARBackend(){
+    const car=v('q5_num'), st=document.getElementById('status_busca');
+    if(!car){alert('Digite o número do CAR');return;}
+    st.innerText='⏳ Puxando dados do SIGCAR... aguarde.';
+    try{
+        const r=await fetch('http://127.0.0.1:3000/api/buscar-car',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({car})});
+        const d=await r.json();
+        if(d.sucesso){
+            st.innerText='✅ Dados recuperados com sucesso!';
+            const p=(id,val)=>{const c=document.getElementById(id);if(c)c.value=val??'';};
+            // Identificação
+            p('status_car_input',       d.status_car);
+            p('q2',                     d.municipio||'');
+            p('nome_imovel',            d.denominacao_imovel||'');
+            p('data_sigcar',            d.data_sigcar||'');
+            p('nome_requerente',        d.nome_requerente);
+            p('cpf_requerente',         d.cpf_requerente);
+            // Áreas principais
+            p('area_escriturada',       d.area_escriturada);
+            p('area_vetorizada',        d.area_vetorizada);
+            p('area_liquida',           d.area_liquida);
+            p('area_remanescente',      d.remanescente);
+            p('area_pousio',            d.pousio);
+            p('area_consolidada',       d.consolidada);
+            p('area_antropizada',       d.antropizada);
+            p('area_uso_alternativo',   d.uso_alternativo);
+            p('area_infra_publica',     d.infra_publica);
+            p('area_utilidade_publica', d.utilidade_publica);
+            p('area_servidao',          d.servidao);
+            // APP
+            p('area_app',               d.app);
+            p('area_app_61a',           d.app_61a);
+            p('area_app_recuperar',     d.app_a_recuperar);
+            // Reserva Legal
+            p('area_rl',                d.reserva_legal);
+            p('area_rl_pct',            d.reserva_legal_pct||'');
+            p('area_rl_suplementar',    d.suplementar);
+            p('area_rl_total',          d.reserva_legal_total);
+            p('area_rl_recuperar',      d.rl_a_recuperar);
+            p('area_arl_veg',           d.arl_com_vegetacao);
+        }else{ st.innerText='❌ Erro: '+d.mensagem; }
+    }catch(e){ st.innerText='❌ Erro: O servidor Python está ligado?'; }
+}
+
+// Preenche a data do parecer com hoje ao abrir a página
+(function(){
+    const c=document.getElementById('data_parecer');
+    if(c&&!c.value){
+        const h=new Date();
+        c.value=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+    }
+})();
+
+// ─── Análise Documental ────────────────────────────────────────
+function toggleDocPend(pendId, valor){
+    const el = document.getElementById(pendId);
+    if(el) el.classList.toggle('hidden', valor === 'SIM');
+}
+
+const _DOC_ITENS = [
+    {id:'doc_req',    label:'Requerimento padrão NATURATINS (Código 300)'},
+    {id:'doc_form',   label:'Formulário de caracterização do grupo florestal modelo NATURATINS'},
+    {id:'doc_car',    label:'Recibo de inscrição do imóvel no CAR'},
+    {id:'doc_croqui', label:'Croqui de acesso ao imóvel (arquivo kml)'},
+    {id:'doc_cert',   label:'Certidão de inteiro teor / documentação de posse'},
+    {id:'doc_pes',    label:'Documentos pessoais (PF) / Contrato social ou IE (PJ)'},
+    {id:'doc_proc',   label:'Procuração'},
+    {id:'doc_pef',    label:'PEF + Inventário Florestal conforme TR NATURATINS'},
+    {id:'doc_shape',  label:'Arquivo digital shapefile (rar) – SIRGAS 2000'},
+    {id:'doc_art',    label:'ART emitida pelo CREA (0363/3101) ou pelo CRBIO'},
+    {id:'doc_licenca',label:'Licença Prévia da Atividade'},
+];
+
+function getDocPendencias(){
+    return _DOC_ITENS
+        .map(it => ({ label:it.label, status:v(it.id), desc:v(it.id+'_desc') }))
+        .filter(it => it.status !== 'SIM');
+}
+
+// ─── Geração do Parecer ────────────────────────────────────────
+function gerarParecer(){
+
+    // Coleta valores
+    const numProcesso    = v('num_processo');
+    const numReq         = v('num_requerimento');
+    const numParecer     = v('num_parecer');
+    const dataParecer    = dataFormatada(v('data_parecer'));
+    const requerente     = v('nome_requerente');
+    const cpfReq         = v('cpf_requerente');
+    const atividade      = v('atividade');
+    const municipio      = v('q2');
+    const respTec        = v('resp_tecnico');
+    const cpfResp        = v('cpf_resp_tecnico');
+    const tituloPof      = v('titulo_prof');
+    const artNum         = v('art_resp_tecnico');
+    const emailResp      = v('email_resp');
+    const telResp        = v('tel_resp');
+    const nomeImovel     = v('nome_imovel');
+    const numCAR         = v('q5_num');
+    const statusCAR      = v('status_car_input');
+    const dataSigcar     = v('data_sigcar');
+    const adesaoPRA      = v('adesao_pra');
+    const bioma          = v('q6');
+    const coordARD       = v('coord_ard');
+    const atividadeARD   = v('atividade');
+
+    const aEsc  = n('area_escriturada');
+    const aVet  = n('area_vetorizada');
+    const aLiq  = n('area_liquida') || aVet;
+    const aRem  = n('area_remanescente');
+    const aPousio = n('area_pousio');
+    const aCons = n('area_consolidada');
+    const aAntr = n('area_antropizada');
+    const aUA   = n('area_uso_alternativo');
+    const aInfra = n('area_infra_publica');
+    const aUtil  = n('area_utilidade_publica');
+    const aServ  = n('area_servidao');
+    const aAPP  = n('area_app');
+    const aAPP61 = n('area_app_61a');
+    const aAPPAntr = n('area_app_recuperar');
+    const aRL   = n('area_rl');
+    const aRLpct = v('area_rl_pct');
+    const aRLS  = n('area_rl_suplementar');
+    const aRLSpct = v('area_rl_suplementar_pct');
+    const aRLT  = n('area_rl_total');
+    const aRLRec = n('area_rl_recuperar');
+    const aARLVeg = n('area_arl_veg') || aRLT;
+    const aARD  = n('area_ard');
+
+    // Inventário
+    const invAmostr = v('inv_amostragem');
+    const invQExig  = v('inv_qtd_exig');
+    const invQLanc  = v('inv_qtd_lanc');
+    const invTam    = v('inv_tam');
+    const invAreaAm = n('inv_area_amostrada');
+    const invIntNec = n('inv_int_nec');
+    const invIntReal= n('inv_int_real');
+    const invCV     = n('inv_cv');
+    const invVolHa  = n('inv_vol_ha');
+    const invErro   = n('inv_erro');
+
+    // Volumes
+    const volLenhaM3 = n('vol_lenha_m3');
+    const volLenhaST = n('vol_lenha_st');
+    const volLapM3   = n('vol_lap_m3');
+    const volToraM3  = n('vol_tora_m3');
+
+    // Análise Documental (checklist)
+    const docPends   = getDocPendencias();
+    const licStatus  = v('doc_licenca');
+    const licDesc    = v('doc_licenca_desc') || '';
+    const pefStatus  = v('doc_pef');
+    const pefDesc    = v('doc_pef_desc') || '';
+
+    // Análise Técnica
+    const temTI      = v('tem_ti');
+    const nomeTI     = v('sobreposicao_ti');
+    const temUC      = v('tem_uc');
+    const nomeUC     = v('sobreposicao_uc');
+    const temQuil    = v('tem_quilombola');
+    const nomeQuil   = v('sobreposicao_quilombola');
+    const rlOK       = v('q10');
+    const destoca    = v('q13');
+    const tipoSupr   = v('q13_1');
+    const espProteg  = v('q14');
+    const amostSuf   = v('q15');
+    const vistoria   = v('q16');
+    const relNum     = v('q16_num');
+    const conclusao  = v('q17');
+    const motivoDesfav = getPendTexto();
+    const repTipo    = v('reposicao_tipo');
+    const analistaNome  = v('analista_nome');
+    const analistaCargo = v('analista_cargo');
+
+    // Cálculo RL necessária
+    const rlNec = (aLiq * 0.35).toFixed(4).replace('.',',');
+
+    // Cálculo ARLS necessária
+    const arlsARD = (aARD * 0.05).toFixed(4).replace('.',',');
+    const arlsAUA = (aUA * 0.05).toFixed(4).replace('.',',');
+    const arlsTotal = ((aARD + aUA) * 0.05).toFixed(4).replace('.',',');
+
+    // Linhas sobreposição TI/UC/Quilombola
+    const linhaTerritorios = (temTI==='Sim' || temUC==='Sim' || temQuil==='Sim')
+        ? `<li>Terras Indígenas / Unidades de Conservação / Áreas Quilombolas: O imóvel <strong>está inserido</strong> em${temTI==='Sim'?' Terra Indígena '+nomeTI:''}${temUC==='Sim'?' Unidade de Conservação '+nomeUC:''}${temQuil==='Sim'?' Área Quilombola '+nomeQuil:''}.</li>`
+        : `<li>Terras Indígenas / Unidades de Conservação / Áreas Quilombolas: O imóvel <strong>não está inserido</strong> no interior dessas áreas.</li>`;
+
+    // Licença — vem do checklist de Análise Documental
+    const linhaLicenca = licStatus==='SIM'
+        ? `O imóvel POSSUI Licença Prévia para a atividade proposta.`
+        : `O imóvel <strong>NÃO POSSUI</strong> Licença Prévia ativa para a atividade proposta.${licDesc?' '+licDesc:''}`;
+
+    // Vistoria
+    let linhaVistoria = '';
+    if(vistoria === 'SIM'){
+        linhaVistoria = `<p>Foi realizada vistoria técnica presencial, conforme Relatório Técnico Nº <strong>${relNum}</strong>.</p>`;
+    } else {
+        linhaVistoria = `<p>O processo em questão <strong>não há</strong> necessidade de vistoria técnica, pois a ARD é INFERIOR a 04 (quatro), módulos fiscais, de acordo com o Inciso I e II do Art. 2 da PORTARIA/NATURATINS n° 44, de 25 de janeiro de 2017.</p>
+        <p class="indent" style="font-size:8pt; font-style:italic;">Art. 2º. I – a vistoria técnica será realizada nos imóveis rurais e urbanos para solicitação de supressão de vegetação nativa, independentemente de sua dimensão, localizados em áreas de Unidades de Conservação – UC da Natureza, conforme Lei Federal nº 9.985/00; II – será dispensada a vistoria técnica nos imóveis rurais ou urbanos com áreas requeridas para desmatamento – ARD inferiores ou iguais a 04 (quatro), módulos fiscais, exceto quando verificada inconsistência entre a volumetria apresentada no inventário florestal e a tipologia vegetal do imóvel.</p>`;
+    }
+
+    // Reposição florestal
+    let repTexto = '';
+    if(repTipo==='vender') repTexto = '( x ) Passar/vender para outro "CPF" a madeira, o qual ficará responsável pela quitação da reposição florestal';
+    else if(repTipo==='terceiros') repTexto = '( x ) Aquisição de reposição florestal de terceiros';
+    else repTexto = '( x ) Outro';
+
+    // Volume TORA
+    const linhaToraVol = volToraM3 > 0
+        ? `<tr><td>Volume Total em TORA</td><td><strong>${fmt(volToraM3)}</strong></td><td>-</td></tr>`
+        : `<tr><td>Volume Total em TORA</td><td><strong>-</strong></td><td>-</td></tr>`;
+
+    // Pendências automáticas do checklist (NÃO / PARCIAL)
+    const pendAutoHtml = docPends.length > 0
+        ? docPends.map((p,i) =>
+            `<p>${i+1}. ${p.label}${p.status==='PARCIAL'?' <em>(PARCIAL)</em>':''}: ${p.desc||'Documentação pendente/incompleta.'}</p>`
+          ).join('')
+        : '';
+    const pendManualHtml = motivoDesfav
+        ? motivoDesfav.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<p>${l}</p>`).join('')
+        : '';
+    const todasPendHtml = [pendAutoHtml, pendManualHtml].filter(Boolean).join('');
+
+    // NUP e Requerimento
+    const linhaReq = numReq ? `NUP. <strong>${numProcesso}</strong> onde solicita` : `onde solicita`;
+
+    const html = `
+<div class="doc-header">
+    <div class="doc-header">
+    <div style="text-align:center;margin-bottom:6pt;">
+        <img src="https://i.ibb.co/jkD5j9L3/Captura-de-tela-2026-04-30-010851.png" style="max-width: 100%; max-height: 250px;" alt="Imagem de Impressão">
+    </div>    
+    <p class="parecer-title">PARECER TÉCNICO Nº ${numParecer}</p>
+    <p class="parecer-date">PALMAS, ${dataParecer}</p>
+</div>
+
+<!-- DADOS GERAIS -->
+<div class="section-box">
+    <div class="section-title">DADOS GERAIS</div>
+    <div class="section-body">
+        <table class="dados-table">
+            <tr><td class="lbl">Processo:</td><td>${numProcesso}</td></tr>
+            <tr><td class="lbl">Requerente:</td><td>${requerente}</td></tr>
+            <tr><td class="lbl">CPF/CNPJ:</td><td>${cpfReq}</td></tr>
+            <tr><td class="lbl">Atividade:</td><td>${atividade}</td></tr>
+            <tr><td class="lbl">Município:</td><td>${municipio}</td></tr>
+            <tr><td class="lbl">Responsável Técnico:</td><td>${respTec}</td></tr>
+            <tr><td class="lbl">CPF/CNPJ:</td><td>${cpfResp}</td></tr>
+            <tr><td class="lbl">Título Profissional:</td><td>${tituloPof} – ART ${artNum}</td></tr>
+            <tr><td class="lbl">E-mail:</td><td>${emailResp}</td></tr>
+            <tr><td class="lbl">Telefone:</td><td>${telResp}</td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- ANÁLISE -->
+<div class="section-box">
+    <div class="section-title">ANÁLISE</div>
+    <div class="section-body">
+        <div class="body-text">
+            <p>O processo em apreço trata-se de requerimento Nº. <strong>${numReq}</strong> ${linhaReq} a <strong>Autorização de ${tipoSupr} – ${tipoSupr}</strong> em uma área de <strong>${fmt(aARD)} hectares</strong> no imóvel denominado <strong>${nomeImovel}</strong>, ${municipio}, com área escriturada de <strong>${fmt(aEsc)} hectares</strong> e <strong>${fmt(aVet)} hectares</strong> vetorizada.</p>
+            <p><strong>A ANÁLISE DESTE PROCESSO FOI REALIZADA POR MEIO DO SISTEMA INTEGRADO DE GESTÃO AMBIENTAL - SIGAM.</strong></p>
+        </div>
+
+        <div class="sub-section">1. DOCUMENTAÇÃO</div>
+        <div class="body-text">
+            <p>A relação documental <strong>${docPends.length===0 ? 'ESTÁ' : 'NÃO ESTÁ'}</strong> de acordo com o exigido no check-list do NATURATINS.</p>
+            <p>${linhaLicenca}</p>
+        </div>
+
+        <div class="sub-section">2. ANÁLISE - CAR/TO nº ${numCAR}</div>
+        <div class="body-text">
+            <p>A análise do CAR foi realizada com base na inscrição <strong>${statusCAR}</strong> no <strong>SIGCAR em ${dataSigcar}</strong>.</p>
+            <p>Constatou-se que <strong>${adesaoPRA==='Sim' ? 'houve' : 'não houve'}</strong> adesão ao Programa de Regularização Ambiental (PRA).</p>
+            <p>Fazendo o cruzamento dos shapes da propriedade com a base vetorial do Naturatins, verificou-se:</p>
+            <ul class="bullet-list">
+                <li>Tipologias Vegetais: Savana (${bioma}).</li>
+                <li>Bioma: ${bioma};</li>
+                <li>Município: ${municipio};</li>
+                ${linhaTerritorios}
+            </ul>
+            <p>De acordo com a inscrição realizada no SIG-CAR, o imóvel supracitado apresenta os seguintes dados relevantes:</p>
+        </div>
+
+        <!-- TABELA DE ÁREAS -->
+        <table class="areas-table">
+            <thead>
+                <tr><th>Dado</th><th>Área (ha)</th><th>% da Área Vetorizada</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>STATUS</td><td colspan="2"><strong>${statusCAR}</strong></td></tr>
+                <tr><td>ADESÃO AO PRA</td><td colspan="2"><strong>${adesaoPRA}</strong></td></tr>
+                <tr><td>ÁREA DO IMÓVEL</td><td><strong>${fmt(aVet)} ha</strong></td><td>100,00%</td></tr>
+                <tr><td>ÁREA LÍQUIDA DO IMÓVEL</td><td><strong>${fmt(aLiq)} ha</strong></td><td>${pct(aLiq,aVet)}</td></tr>
+                <tr><td>REMANESCENTE DE VEGETAÇÃO NATIVA</td><td><strong>${fmt(aRem)} ha</strong></td><td>${pct(aRem,aVet)}</td></tr>
+                ${aPousio>0?`<tr><td>ÁREA DE POUSIO</td><td><strong>${fmt(aPousio)} ha</strong></td><td>${pct(aPousio,aVet)}</td></tr>`:''}
+                <tr><td>ÁREA CONSOLIDADA</td><td><strong>${fmt(aCons)} ha</strong></td><td>${pct(aCons,aVet)}</td></tr>
+                <tr><td>ÁREA ANTROPIZADA APÓS 22/07/2008</td><td><strong>${fmt(aAntr)} ha</strong></td><td>${pct(aAntr,aVet)}</td></tr>
+                <tr><td>ÁREA DE USO ALTERNATIVO (AC + AA - APP - ARL)</td><td><strong>${fmt(aUA)} ha</strong></td><td>${pct(aUA,aVet)}</td></tr>
+                ${aInfra>0?`<tr><td>ÁREA DE INFRAESTRUTURA PÚBLICA</td><td><strong>${fmt(aInfra)} ha</strong></td><td>${pct(aInfra,aVet)}</td></tr>`:''}
+                ${aUtil>0?`<tr><td>ÁREA DE UTILIDADE PÚBLICA</td><td><strong>${fmt(aUtil)} ha</strong></td><td>${pct(aUtil,aVet)}</td></tr>`:''}
+                ${aServ>0?`<tr><td>SERVIDÃO ADMINISTRATIVA</td><td><strong>${fmt(aServ)} ha</strong></td><td>${pct(aServ,aVet)}</td></tr>`:''}
+                <tr><td>APP</td><td><strong>${fmt(aAPP)} ha</strong></td><td>${pct(aAPP,aVet)}</td></tr>
+                <tr><td>APP SEGUNDO ART. 61-A DA LEI 12.651 DE 2012</td><td><strong>${fmt(aAPP61)} ha</strong></td><td>${pct(aAPP61,aVet)}</td></tr>
+                <tr><td>APP ANTROPIZADA</td><td><strong>${fmt(aAPPAntr)} ha</strong></td><td>${pct(aAPPAntr,aVet)}</td></tr>
+                <tr><td>RESERVA LEGAL PROPOSTA</td><td><strong>${fmt(aRL)} ha</strong></td><td>${aRLpct||pct(aRL,aLiq)+' da área líquida'}</td></tr>
+                <tr><td>RESERVA LEGAL SUPLEMENTAR</td><td><strong>${fmt(aRLS)} ha</strong></td><td>${aRLSpct||pct(aRLS,aVet)}</td></tr>
+                <tr class="total-row"><td>ÁREA DE RESERVA LEGAL TOTAL</td><td><strong>${fmt(aRLT)} ha</strong></td><td>${pct(aRLT,aLiq)} da área líquida</td></tr>
+                ${aRLRec>0?`<tr><td>RL A RECUPERAR</td><td><strong>${fmt(aRLRec)} ha</strong></td><td>${pct(aRLRec,aLiq)} da área líquida</td></tr>`:''}
+                <tr><td>ARL COM VEGETAÇÃO</td><td><strong>${fmt(aARLVeg)} ha</strong></td><td>${pct(aARLVeg,aLiq)} da área líquida</td></tr>
+            </tbody>
+        </table>
+
+        <!-- APP -->
+        <div class="sub-section">2.5 ÁREA DE PRESERVAÇÃO PERMANENTE – APP</div>
+        <div class="body-text">
+            <p>Com base na base de dados do NATURATINS, que utiliza como referência os trechos de drenagem da SEMARH, foram demarcadas as hidrografias que geram Áreas de Preservação Permanente (APPs). Assim, os <strong>${fmt(aAPP)} hectares</strong> de APP foram automaticamente delimitados conforme a legislação vigente.</p>
+            <p>Dentre as APPs, foram declarados <strong>${fmt(aAPPAntr)} hectares</strong> como áreas antropizadas, que deverão ser isoladas para dar início ao processo de regeneração. Do total, <strong>${fmt(aAPP61)} hectares</strong> são APPs conforme o artigo 61-A da Lei nº 12.651, de 2012, e <strong>${fmt(aAPPAntr)} hectares</strong> correspondem a áreas suprimidas após 22 de julho de 2008.</p>
+        </div>
+
+        <!-- CÁLCULO RL -->
+        <div class="sub-section">2.7 CÁLCULO DE RESERVA LEGAL</div>
+        <table class="calc-table">
+            <thead>
+                <tr><th>ARL apresentada no CAR (ha)</th><th>Classe</th><th>Área por Tipologia (ha)</th><th>ARL Necessária (ha)</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>${fmt(aRL)} ha (${pct(aRL,aLiq)})</td>
+                    <td>Savana (Cerrado)</td>
+                    <td>${fmt(aLiq)} ha</td>
+                    <td>${fmt(aLiq)} × 0,35 = ${rlNec} ha</td>
+                </tr>
+                <tr><td></td><td>Floresta</td><td>0,0000 ha</td><td>0,0000 × 0,80 = 00,0000 ha</td></tr>
+                <tr><td></td><td>Savana (Cerrado) <strong>Ao Sul do Paralelo 13°</strong></td><td>0,0000 ha</td><td>0,0000 × 0,20 = 00,0000 ha</td></tr>
+                <tr class="total-row"><td colspan="2"><strong>TOTAL</strong></td><td><strong>${fmt(aLiq)} ha</strong></td><td><strong>${rlNec} ha</strong></td></tr>
+            </tbody>
+        </table>
+        <div class="body-text">
+            <p>A Reserva Legal fora proposta na propriedade com <strong>${fmt(aRL)} ha (${pct(aRL,aLiq)})</strong> estando em <strong>${rlOK==='SIM'?'CONFORMIDADE':'NÃO CONFORMIDADE'}</strong> com o Código Florestal (Lei Federal 12.651/2012), ${aRL>=parseFloat(rlNec.replace(',','.'))? 'SUPERIOR':'INFERIOR'} ao exigido na legislação vigente para a tipologia vegetal constituída de CERRADO, SENDO NECESSÁRIO apresentar um quantitativo total de <strong>${rlNec} hectares</strong> de Reserva Legal.</p>
+        </div>
+
+        <!-- CÁLCULO ARLS -->
+        <div class="sub-section">CÁLCULO DE RESERVA SUPLEMENTAR</div>
+        <table class="calc-table">
+            <thead>
+                <tr><th>Tipo da Área</th><th>Área (ha)</th><th>FR Espécies Protegidas</th><th>ARLS</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>ARD</td><td>${fmt(aARD)} ha</td><td>5%</td><td>${fmt(aARD)} × 0,05 = ${arlsARD} ha</td></tr>
+                <tr><td>AUA</td><td>${fmt(aUA)} ha</td><td>5%</td><td>${fmt(aUA)} × 0,05 = ${arlsAUA} ha</td></tr>
+                <tr class="total-row"><td><strong>TOTAL</strong></td><td><strong>${fmt(aARD+aUA)} ha</strong></td><td>-</td><td><strong>${arlsTotal} ha</strong></td></tr>
+            </tbody>
+        </table>
+        <div class="body-text">
+            <p>Adicionalmente, cabe destacar que a propriedade possui um excedente de <strong>${fmt(aRLS)}</strong>, proposto como Área de Reserva Legal Suplementar (ARLs), destinado a compensar o controle de espécies protegidas conforme o Art. 123 do COEMA/TO nº 07, de 09 de agosto de 2005. Assim, o imóvel possui um TOTAL de <strong>${fmt(aRLT)} hectares</strong> de Reserva Legal, correspondendo a <strong>${pct(aRLT,aLiq)}</strong> da área líquida da propriedade.</p>
+        </div>
+
+        <!-- PEF -->
+        <div class="sub-section">3. PROJETO DE EXPLORAÇÃO FLORESTAL</div>
+        <div class="body-text">
+            <p>O Projeto de Exploração Florestal – PEF <strong>${
+                pefStatus==='SIM'     ? 'ESTÁ de acordo'         :
+                pefStatus==='PARCIAL' ? 'ESTÁ PARCIALMENTE de acordo' :
+                                        'NÃO ESTÁ de acordo'
+            }</strong> com o Roteiro Técnico para elaboração de Projeto de Exploração Florestal fornecido pelo NATURATINS.${pefDesc?' '+pefDesc:''}</p>
+        </div>
+
+        <!-- INVENTÁRIO -->
+        <div class="sub-section">4. INVENTÁRIO FLORESTAL</div>
+        <div class="body-text indent">
+            <p>- Área Requerida para Desmatamento (ARD): <strong>${fmt(aARD)} ha</strong></p>
+            <p>- Latitude / Longitude: <strong>${coordARD}</strong></p>
+            <p>- Atividade a ser implantada na ARD: <strong>${atividadeARD}</strong>;</p>
+            <p>- Tipo de Desmatamento: <strong>${destoca==='SIM' ? 'Mecanizado com destoca' : 'Sem destoca'}</strong>;</p>
+            <p>- Supressão de Espécies Protegidas: <strong>${espProteg==='SIM – Com supressão' ? 'Com supressão' : 'Sem supressão de espécies protegidas'}</strong>;</p>
+            <p>- Processo de Amostragem: <strong>${invAmostr}</strong>;</p>
+            <p>- Quantidade de Amostras Exigidas: <strong>${invQExig} amostras</strong>;</p>
+            <p>- Quantidade de Amostras Lançadas: <strong>${invQLanc} amostras – ${amostSuf==='SIM'?'suficiente':'insuficiente'}</strong>;</p>
+            <p>- Tamanho das Amostras: <strong>${invTam}</strong>;</p>
+            <p>- Área amostrada: <strong>${fmt(invAreaAm)} ha</strong>;</p>
+            <p>- Intensidade Amostral Necessária: <strong>${invIntNec.toFixed(2).replace('.',',')}%</strong>;</p>
+            <p>- Intensidade Amostral Realizada: <strong>${invIntReal.toFixed(2).replace('.',',')}%</strong>;</p>
+            <p>- Coeficiente de Variação: <strong>± ${invCV.toFixed(2).replace('.',',')} %</strong>;</p>
+            <p>- Volume por Hectare: <strong>${fmt(invVolHa)} m³/ha</strong>;</p>
+            <p>- Erro de Amostragem Relativo: <strong>${invErro.toFixed(2).replace('.',',')} %</strong>, estando ${invErro<=20?'abaixo':'acima'} do erro máximo de 20,0% para volumetria ${invVolHa<50?'inferior':'superior'} a 50 m³/hectares.</p>
+        </div>
+
+        <!-- REPOSIÇÃO -->
+        <div class="sub-section">5. FORMA DE CUMPRIMENTO DA REPOSIÇÃO FLORESTAL</div>
+        <div class="body-text">
+            <p>${repTexto}</p>
+        </div>
+
+        <!-- VOLUMETRIA -->
+        <div class="sub-section">6. RESUMO DE VOLUMETRIA PARA A ÁREA</div>
+        <table class="vol-table">
+            <thead>
+                <tr><th>PRODUTO</th><th>VOLUME M³</th><th>VOLUME ST</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Volume Total de LENHA</td><td><strong>${fmt(volLenhaM3)}</strong></td><td><strong>${fmt(volLenhaST)}</strong></td></tr>
+                <tr><td>Volume Total em LAPIDADOS</td><td><strong>${fmt(volLapM3)}</strong></td><td>-</td></tr>
+                ${linhaToraVol}
+            </tbody>
+        </table>
+
+        <!-- VISTORIA -->
+        <div class="sub-section">7. VISTORIA TÉCNICA</div>
+        <div class="body-text">${linhaVistoria}</div>
+    </div>
+</div>
+
+<!-- CONDICIONANTES -->
+<div class="section-box">
+    <div class="section-title">CONDICIONANTES</div>
+    <div class="section-body">
+        <div class="cond-box">
+            <p>Conforme Resolução COEMA/TO nº 07/2005:</p>
+            <p>O empreendedor e os profissionais serão responsáveis pelos documentos, informações, estudos e projetos apresentados, sujeitando-se às sanções administrativas, civis e penais cabíveis;</p>
+            <p>O NATURATINS, mediante decisão motivada, poderá modificar as condicionantes e medidas de controle e adequação, suspender ou cancelar os atos administrativos expedidos, quando ocorrer o descumprimento de quaisquer condicionantes ou normas legais, a omissão ou falsa descrição de informações relevantes que subsidiaram a expedição da licença ou da autorização, a superveniência de graves riscos ambientais e de saúde, ou a mudança e comprometimento dos aspectos ambientais decorrentes de conflitos pelo uso dos recursos naturais.</p>
+            <p>As coordenadorias de monitoramento e fiscalização poderão realizar, a qualquer tempo, vistoria técnica para averiguar o cumprimento das exigências e recomendações, objeto deste licenciamento.</p>
+        </div>
+    </div>
+</div>
+
+<!-- RECOMENDAÇÕES -->
+<div class="section-box">
+    <div class="section-title">RECOMENDAÇÕES</div>
+    <div class="section-body">
+        <ul class="bullet-list">
+            <li><strong>É extremamente proibida a coleta, a supressão, o transporte, o armazenamento, o manejo, o beneficiamento e a comercialização das espécies protegidas (imunes), sem a autorização do NATURATINS;</strong></li>
+            <li><strong>Manter as Áreas de Reserva Legal – ARL e Áreas de Preservação Permanente – APP preservadas, livres de roçadas e queimadas;</strong></li>
+            <li><strong>Manter o Recibo da Inscrição do SIG-CAR na propriedade e a Autorização de Exploração Florestal (${tipoSupr}) no local da supressão;</strong></li>
+            <li><strong>Seguir rigorosamente as exigências contidas nas licenças e/ou autorizações emitidas pelo NATURATINS;</strong></li>
+            <li><strong>O arquivo shapefile do Perfil Ambiental do SINAFLOR não foi considerado nesta autorização;</strong></li>
+            <li><strong>O arquivo shapefile autorizado neste ato, encontra-se disponível no Sistema SIGAM e na ABA ANEXO do SINAFLOR. Caso seja encontrado qualquer divergência entre eles, será considerado o arquivo shapefile anexado ao SIGAM;</strong></li>
+            <li><strong>CAR analisado conforme Instrução Normativa IBAMA Nº 19, DE 8 DE NOVEMBRO DE 2024.</strong></li>
+        </ul>
+    </div>
+</div>
+
+<!-- CONCLUSÃO -->
+<div class="section-box no-break">
+    <div class="section-title">CONCLUSÃO</div>
+    <div class="section-body">
+        <div class="conclusao-box">
+            <p>Pelo exposto, conclui-se <strong>${conclusao}</strong> ao deferimento do pleito.</p>
+            ${todasPendHtml ? `<div class="pend-box"><div class="pend-title">PENDÊNCIA(S)/MOTIVO(S):</div>${todasPendHtml}</div>` : ''}
+            <p>Recomenda-se que, a expedição dos atos administrativos correspondentes às atividades ora requeridas, a saber:</p>
+            <p><strong>1 – Autorização de ${tipoSupr}</strong> para a supressão de <strong>${fmt(aARD)} hectares</strong>, apresentando o seguinte rendimento e destinação do material lenhoso:</p>
+            <ul class="bullet-list">
+                ${volLenhaM3>0?`<li><strong>${fmt(volLenhaM3)} m³ (${fmt(volLenhaST)} ST) de espécies diversas destinadas para lenha;</strong></li>`:''}
+                ${volLapM3>0?`<li><strong>${fmt(volLapM3)} m³ de espécies diversas destinadas para lapidados;</strong></li>`:''}
+                ${volToraM3>0?`<li><strong>${fmt(volToraM3)} m³ de espécies diversas destinadas para tora;</strong></li>`:''}
+            </ul>
+            <p>É o parecer técnico.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ASSINATURA -->
+<div class="assinatura">
+    <p>Palmas - TO, ${dataParecer}</p>
+    <br><br>
+    <div class="linha"></div>
+    <p><strong>${analistaNome}</strong></p>    
+    <p>NATURATINS – Instituto Natureza do Tocantins</p>
+</div>
+`;
+
+    document.getElementById('pdf-content').innerHTML = html;
+    window.print();
+}
+</script>
+
+<!-- SheetJS — leitura de planilhas Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ================================================================
+ *  MÓDULO DE INVENTÁRIO FLORESTAL — integração com o formulário
+ * ================================================================ */
+
+// ── Importar planilha ─────────────────────────────────────────────
+function importarInventario() {
+    const fileEl = document.getElementById('imp_file');
+    const stEl   = document.getElementById('imp_status');
+    const resEl  = document.getElementById('imp_resultado');
+    if (!fileEl.files.length) { stEl.innerText = '⚠️ Selecione um arquivo .xlsx ou .xls.'; return; }
+
+    stEl.innerText = '⏳ Processando…';
+    resEl.style.display = 'none';
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const wb  = XLSX.read(new Uint8Array(e.target.result),
+                                  { type: 'array', cellFormula: false, cellNF: false });
+            const inv = lerInventario(wb);
+            const vol = lerVolumesPlano(wb);
+
+            if (!inv || !inv.n) {
+                stEl.innerText = '❌ Planilha não reconhecida. Verifique se é um inventário Naturatins.';
+                return;
+            }
+            stEl.style.color = '#15803d';
+            stEl.innerText = `✅ ${inv.n} volumes lidos · Formato: ${inv.formato} · Inventário + Volumetria preenchidos!`;
+
+            preencherFormulario(inv, vol);
+            exibirCards(inv, vol);
+            resEl.style.display = 'block';
+            document.getElementById('imp_ok').style.display = 'block';
+            document.getElementById('inv_amostragem')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (err) {
+            stEl.innerText = '❌ Erro ao processar: ' + err.message;
+            console.error(err);
+        }
+    };
+    reader.readAsArrayBuffer(fileEl.files[0]);
+}
+
+// ── Importar Volumetria de Censo (ACAIO/ACAIM/AEFS) ───────────────
+// Só preenche os 4 campos de volumetria, sem dados estatísticos.
+function importarVolumetriaCenso() {
+    const fileEl = document.getElementById('imp_file_censo');
+    const stEl   = document.getElementById('imp_status_censo');
+    const resEl  = document.getElementById('imp_resultado_censo');
+    if (!fileEl.files.length) { stEl.style.color = '#b91c1c'; stEl.innerText = '⚠️ Selecione um arquivo .xlsx ou .xls.'; return; }
+
+    stEl.style.color = '';
+    stEl.innerText = '⏳ Processando…';
+    resEl.style.display = 'none';
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const wb  = XLSX.read(new Uint8Array(e.target.result),
+                                  { type: 'array', cellFormula: false, cellNF: false });
+
+            // 1) tenta os leitores existentes (lerVolumesPlano cobre 4 formatos)
+            let vol = lerVolumesPlano(wb);
+
+            // 2) tenta formatos extras específicos de censo
+            if (!vol || vol.vol_lenha_m3 === 0 && vol.vol_tora_m3 === 0 && vol.vol_lap_m3 === 0) {
+                vol = lerVolumesCensoExtra(wb) || vol;
+            }
+
+            const algumVolume = vol && (vol.vol_lenha_m3 > 0 || vol.vol_lenha_st > 0 || vol.vol_lap_m3 > 0 || vol.vol_tora_m3 > 0);
+            if (!algumVolume) {
+                stEl.style.color = '#b91c1c';
+                stEl.innerText = '❌ Nenhum volume reconhecido. Verifique se a planilha possui aba de classificação do material lenhoso, sortimento, declaração florestal, quadro resumo ou SINAFLOR.';
+                return;
+            }
+
+            preencherVolumetria(vol);
+            exibirCardsCenso(vol);
+            stEl.style.color = '#1d4ed8';
+            stEl.innerText = '✅ Volumetria lida com sucesso — campos preenchidos.';
+            resEl.style.display = 'block';
+            document.getElementById('imp_ok_censo').style.display = 'block';
+            document.getElementById('vol_lenha_m3')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (err) {
+            stEl.style.color = '#b91c1c';
+            stEl.innerText = '❌ Erro ao processar: ' + err.message;
+            console.error(err);
+        }
+    };
+    reader.readAsArrayBuffer(fileEl.files[0]);
+}
+
+// ── Preencher apenas a Volumetria ─────────────────────────────────
+function preencherVolumetria(vol) {
+    const flash = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el || val === null || val === undefined || val === '') return;
+        el.value = String(val);
+        el.style.transition = 'background .5s';
+        el.style.background  = '#dbeafe';
+        setTimeout(() => { el.style.background = ''; }, 2500);
+    };
+    flash('vol_lenha_m3', vol.vol_lenha_m3 > 0 ? vol.vol_lenha_m3.toFixed(4) : '');
+    flash('vol_lenha_st', vol.vol_lenha_st > 0 ? vol.vol_lenha_st.toFixed(4) : '');
+    flash('vol_lap_m3',   vol.vol_lap_m3   > 0 ? vol.vol_lap_m3.toFixed(4)   : '');
+    flash('vol_tora_m3',  vol.vol_tora_m3  > 0 ? vol.vol_tora_m3.toFixed(4)  : '');
+}
+
+// ── Cards de resultado para censo ─────────────────────────────────
+function exibirCardsCenso(vol) {
+    const card = (label, val, color) => `
+        <div style="background:rgba(255,255,255,.12);border-radius:7px;padding:9px 11px;">
+            <div style="font-size:9px;font-weight:700;color:${color||'#93c5fd'};text-transform:uppercase;letter-spacing:.5px;">${label}</div>
+            <div style="font-size:14px;font-weight:800;margin-top:3px;">${val}</div>
+        </div>`;
+    const f4 = x => x != null ? (+x).toFixed(4) : '–';
+    document.getElementById('imp_cards_censo').innerHTML =
+        (vol.vol_lenha_m3 > 0 ? card('Lenha (m³)',     f4(vol.vol_lenha_m3)) : '') +
+        (vol.vol_lenha_st > 0 ? card('Lenha (st)',     f4(vol.vol_lenha_st)) : '') +
+        (vol.vol_lap_m3   > 0 ? card('Lapidados (m³)', f4(vol.vol_lap_m3))   : '') +
+        (vol.vol_tora_m3  > 0 ? card('Tora/Serr. (m³)',f4(vol.vol_tora_m3))  : '') ||
+        '<div style="color:#fca5a5;font-size:12px;">Nenhum volume positivo encontrado.</div>';
+}
+function preencherFormulario(inv, vol) {
+    const flash = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el || val === null || val === undefined || val === '') return;
+        el.value = String(val);
+        el.style.transition = 'background .5s';
+        el.style.background  = '#d1fae5';
+        setTimeout(() => { el.style.background = ''; }, 2500);
+    };
+    // ARD — só preenche se estiver vazio (não sobrescrever o que o usuário já digitou)
+    const ardEl = document.getElementById('area_ard');
+    if (ardEl && !ardEl.value && inv.ard > 0) flash('area_ard', inv.ard.toFixed(4));
+    // ── Inventário ──
+    flash('inv_qtd_exig',       inv.uasExig);
+    flash('inv_qtd_lanc',       inv.uasLanc);
+    flash('inv_tam',            inv.tamDesc);
+    flash('inv_area_amostrada', inv.areaAmostrada > 0 ? inv.areaAmostrada.toFixed(4) : '');
+    flash('inv_int_nec',        inv.intNec  > 0 ? inv.intNec.toFixed(2)  : '');
+    flash('inv_int_real',       inv.intReal > 0 ? inv.intReal.toFixed(2) : '');
+    flash('inv_cv',             inv.cv   > 0 ? inv.cv.toFixed(2)   : '');
+    flash('inv_vol_ha',         inv.volHa > 0 ? inv.volHa.toFixed(4) : '');
+    flash('inv_erro',           inv.eRel  > 0 ? inv.eRel.toFixed(2)  : '');
+    // Volumetria
+    flash('vol_lenha_m3', vol.vol_lenha_m3 > 0 ? vol.vol_lenha_m3.toFixed(4) : '');
+    flash('vol_lenha_st',  vol.vol_lenha_st  > 0 ? vol.vol_lenha_st.toFixed(4)  : '');
+    flash('vol_lap_m3',   vol.vol_lap_m3   > 0 ? vol.vol_lap_m3.toFixed(4)   : '');
+    flash('vol_tora_m3',  vol.vol_tora_m3  > 0 ? vol.vol_tora_m3.toFixed(4)  : '');
+}
+
+// ── Cards de resultado ────────────────────────────────────────────
+function exibirCards(inv, vol) {
+    const card = (label, val, color) => `
+        <div style="background:rgba(255,255,255,.12);border-radius:7px;padding:9px 11px;">
+            <div style="font-size:9px;font-weight:700;color:${color||'#86efac'};text-transform:uppercase;letter-spacing:.5px;">${label}</div>
+            <div style="font-size:14px;font-weight:800;margin-top:3px;">${val}</div>
+        </div>`;
+    const f2 = x => x != null ? (+x).toFixed(2) : '–';
+    const f4 = x => x != null ? (+x).toFixed(4) : '–';
+    document.getElementById('imp_cards').innerHTML =
+        card('Formato',        inv.formato)                         +
+        card('Parcela',        inv.tamDesc)                         +
+        card('UAs Lançadas',   inv.uasLanc,         '#34d399')      +
+        card('UAs Exigidas',   inv.uasExig,          '#34d399')     +
+        card('Vol./Hectare',   f2(inv.volHa) + ' m³/ha')           +
+        card('CV',             f2(inv.cv) + ' %')                   +
+        card('Erro Amostral',  f2(inv.eRel) + ' %')                 +
+        card('Int.Nec.',       f2(inv.intNec) + ' %')               +
+        card('Int.Real.',      f2(inv.intReal) + ' %')              +
+        card('Área Amostrada', f4(inv.areaAmostrada) + ' ha')       +
+        (vol.vol_lenha_m3  > 0 ? card('Lenha M³',  f4(vol.vol_lenha_m3))  : '') +
+        (vol.vol_lenha_st  > 0 ? card('Lenha ST',  f4(vol.vol_lenha_st))  : '') +
+        (vol.vol_lap_m3    > 0 ? card('Lapidados', f4(vol.vol_lap_m3))    : '') +
+        (vol.vol_tora_m3   > 0 ? card('Tora/Serr.M³', f4(vol.vol_tora_m3)) : '') +
+        `<div style="grid-column:1/-1;background:${inv.aprovado?'rgba(52,211,153,.2)':'rgba(239,68,68,.2)'};
+             border-radius:7px;padding:9px 11px;font-weight:800;font-size:12px;">
+            ${inv.aprovado
+                ? `✅ SIM — Erro ${f2(inv.eRel)}% ≤ ${inv.LE}% — Aprovada!`
+                : `❌ NÃO — Erro ${f2(inv.eRel)}% > ${inv.LE}% — Faltam ${Math.max(0,inv.uasExig-inv.uasLanc)} UAs.`}
+        </div>`;
+}
+
+// ── Visibilidade por tipo de supressão ────────────────────────────
+function atualizarVisibilidadeSupressao() {
+    const tipo = (document.getElementById('q13_1') || {}).value || '';
+    const isCenso = /^(ACAIO|ACAIM|AEFS)$/i.test(tipo);
+    const bi  = document.getElementById('box-import');         // verde (AEF)
+    const bic = document.getElementById('box-import-censo');   // azul (censo)
+    const si  = document.getElementById('section-inventario'); // dados estatísticos do inventário
+    if (bi)  bi.style.display  = isCenso ? 'none' : '';
+    if (si)  si.style.display  = isCenso ? 'none' : '';
+    if (bic) bic.style.display = isCenso ? '' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('q13_1');
+    if (el) {
+        el.addEventListener('change', atualizarVisibilidadeSupressao);
+        atualizarVisibilidadeSupressao();
+    }
+    // Preencher data do parecer com hoje
+    const dp = document.getElementById('data_parecer');
+    if (dp && !dp.value) {
+        const h = new Date();
+        dp.value = `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+    }
+});
+
+/* ================================================================
+ *  MÓDULO CORE — funções de leitura (auto-contido, sem dependências DOM)
+ * ================================================================ */
+/**
+ * ============================================================
+ *  MÓDULO DE LEITURA DE INVENTÁRIO FLORESTAL — NATURATINS/TO
+ * ============================================================
+ *
+ * Suporta todos os formatos identificados:
+ *
+ * FORMATO A — AAS Naturatins padrão
+ *   Aba stat : "3 _ IF AAS" | "IF AAS" | "IF Amostral"
+ *   Aba vol  : "4 _ CLASS_MATERIAL LENHOSO" | "4 CLASS MATERIAL LENHOSO"
+ *              | "Class Material Lenhoso"
+ *   Arquivos : CHACARA, MARATONA, TARUM, MANGA, PECUARIA, PECUARIA2,
+ *              ATUALIZADO, INVENT_RIO
+ *
+ * FORMATO B — Análise Estatística (MODESTIA / MALHADA)
+ *   Aba stat : "ANÁLISE ESTATÍSTICA"
+ *   Aba vol  : "DECLARAÇÃO FLORESTAL"
+ *   Col stat : A=UA(int), B=vol(m³/parcela); headers L1-L5, dados a partir
+ *              da linha com "Unidade Amostral"
+ *   Arquivos : MODESTIA, MALHADA
+ *
+ * FORMATO C — Estatística com acento XLS (INVENT_XLS / PALESTINA / INVENT2)
+ *   Aba stat : "Estatística"
+ *   Aba vol  : "Classificação do Material"
+ *   Col stat : B=parcela(int), C=vol; cabeçalho "Parcela" em col B
+ *   Vol      : linha TOTAL, col20=lenha m³, col21=lenha st, col25=tora
+ *   Arquivos : INVENTARIOFLORESTAL, PALESTINA, INVENTARIO_FLORESTAL
+ *
+ * FORMATO D — Estatistica sem acento (FLAAVIO MAIA)
+ *   Aba stat : "Estatistica"
+ *   Aba vol  : "QUADRO RESUMO"
+ *   Col stat : A=UA(int digits), C=vol; cabeçalho "AMOSTRA"
+ *   Fallback : aba "Campo", col A=UA, col U=VTcc
+ *   Arquivos : INVENTARIO_FL_VIO_MAIA
+ *
+ * FORMATO E — Safira / Analise estatística (col0=parcela, col1=vol, col3=CALCULOS)
+ *   Aba stat : "Analise estatística" (com acento em minúsculo, sem til)
+ *   Aba vol  : "Declaração Florestal"
+ *   Arquivos : SAFIRA
+ *
+ * FORMATO F — Sistemático (NATIVO)
+ *   Aba stat : "Plan1" com cabeçalho "INVENTÁRIO SISTEMÁTICO"
+ *   Grupos de 100 UAs em colunas B, E, H, K... (idx 1, 4, 7, 10...)
+ *   Arquivos : NATIVO_AMOSTRAGEM_SISTEMATICA
+ */
+
+'use strict';
+
+/* ── UTILITÁRIOS ────────────────────────────────────────────── */
+
+function toRows(sheet) {
+  if (!sheet) return [];
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+}
+
+function num(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return isNaN(v) ? null : v;
+  const s = String(v).replace(/[^\d.,\-]/g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+function str(v) {
+  return v === null || v === undefined ? '' : String(v);
+}
+
+function positiveNums(row) {
+  return (row || []).map(num).filter(v => v !== null && v > 0);
+}
+
+/* ── ESTATÍSTICA ────────────────────────────────────────────── */
+
+function tStudent(df) {
+  const T = [12.706,4.303,3.182,2.776,2.571,2.447,2.365,2.306,2.262,2.228,
+             2.201,2.179,2.160,2.145,2.131,2.120,2.110,2.101,2.093,2.086,
+             2.080,2.074,2.069,2.064,2.060,2.056,2.052,2.048,2.045,2.042,
+             2.040,2.037,2.035,2.032,2.030,2.028,2.026,2.024,2.023,2.021,
+             2.020,2.018,2.017,2.015,2.014,2.013,2.012,2.011,2.010,2.009,
+             2.008,2.007,2.006,2.005,2.004,2.003,2.002,2.002,2.001,2.000];
+  if (df <= 0)   return 12.706;
+  if (df <= 60)  return T[df - 1];
+  if (df <= 80)  return 1.990;
+  if (df <= 100) return 1.984;
+  if (df <= 120) return 1.980;
+  return 1.960;
+}
+
+/**
+ * Calcula estatísticas AAS com correção de população finita.
+ * @param {number[]} vols   - Volumes por parcela (m³/parcela)
+ * @param {number}   tamP   - Tamanho da parcela (ha)
+ * @param {number}   ard    - Área a ser desmatada (ha)
+ * @param {number}   N      - Número total de parcelas possíveis
+ */
+function calcEstatistica(vols, tamP, ard, N) {
+  const n = vols.length;
+  if (n < 2) return { nNec: 0, cv: 0, eRel: 0, volHa: 0, LE: 20,
+                      intNec: 0, intReal: 0, areaAmostrada: n * tamP };
+
+  const media = vols.reduce((a, b) => a + b, 0) / n;
+  const vari  = vols.reduce((s, v) => s + Math.pow(v - media, 2), 0) / (n - 1);
+  const f     = N > 0 ? n / N : 0;
+  const fc    = f < 0.98 ? 1 - f : 1;           // fator de correção finita
+  const vM    = (vari / n) * fc;
+  const epm   = Math.sqrt(vM);
+  const t     = tStudent(n - 1);
+  const volHa = tamP > 0 ? media / tamP : 0;
+  const LE    = volHa > 50 ? 10 : 20;           // limite de erro admitido (%)
+
+  const cv   = media > 0 ? (Math.sqrt(vari) / media) * 100 : 0;
+  const eRel = media > 0 ? (t * epm / media) * 100 : 0;
+
+  // n necessário (iterativo até convergir)
+  let nNec = media > 0
+    ? Math.ceil((t * t * vari) / Math.pow((LE / 100) * media, 2))
+    : 0;
+  if (N > 0 && nNec > 0) nNec = Math.ceil(nNec / (1 + nNec / N));
+
+  const intNec  = N > 0 ? (nNec / N) * 100 : 0;
+  const intReal = N > 0 ? (n    / N) * 100 : 0;
+
+  return { nNec, cv, eRel, volHa, LE, intNec, intReal,
+           areaAmostrada: n * tamP };
+}
+
+/* ══════════════════════════════════════════════════════════════
+ *  LEITORES DE ESTATÍSTICA
+ * ══════════════════════════════════════════════════════════════ */
+
+/**
+ * FORMATO A — AAS Naturatins padrão
+ * Aba: "3 _ IF AAS" | "IF AAS" | "IF Amostral"
+ * Cabeçalho: linha com col0="U.A.(n)", col1=tamParcela
+ * Volumes  : col0=UA(número), col1=vol(m³), até linha "Total"
+ * Estatística: lida abaixo dos volumes (ÁREA A SER DESMATADA, INVENTARIADAS…)
+ */
+function lerAAS(rows) {
+  let tamP = 0.1, iInicio = -1;
+
+  for (let i = 0; i < rows.length; i++) {
+    const c0 = str((rows[i] || [])[0]).toUpperCase().trim();
+    if (c0 === 'U.A.(N)' || c0 === 'U.A. (N)') {
+      const tp = num((rows[i] || [])[1]);
+      if (tp && tp > 0 && tp <= 1) tamP = tp;
+      iInicio = i + 1;
+      break;
+    }
+  }
+  if (iInicio < 0) return null;
+
+  const volumes = [];
+  let iFim = rows.length;
+  for (let i = iInicio; i < rows.length; i++) {
+    const r   = rows[i] || [];
+    const c0  = str(r[0]).toUpperCase().trim();
+    if (/^TOTAL$/.test(c0) || /ANÁLISE|ANALISE/.test(c0)) { iFim = i; break; }
+    const ua  = num(r[0]);
+    const vol = num(r[1]);
+    if (ua !== null && ua > 0 && vol !== null && vol >= 0) volumes.push(vol);
+  }
+  if (!volumes.length) return null;
+
+  let ard = 0, N = 0, uasLanc = volumes.length, uasExig = 0, tamDescExtra = null;
+
+  for (let i = iFim; i < Math.min(rows.length, iFim + 80); i++) {
+    const r   = rows[i] || [];
+    const lbl = str(r[0]).toUpperCase() + ' ' + str(r[1]).toUpperCase();
+    const ns  = r.map(num).filter(v => v !== null);
+    const pos = r.map(num).filter(v => v !== null && v > 0);
+    if (!ns.length) continue;
+
+    if (/ÁREA A SER DESMAT/.test(lbl))   ard     = pos[pos.length - 1] || 0;
+    if (/TOTAL DA POPULA/.test(lbl))     N       = pos[pos.length - 1] || 0;
+    if (/EXIGIDO/.test(lbl))             uasExig = Math.ceil(pos[0] || 0);
+    if (/INVENTARIADAS/.test(lbl))       uasLanc = Math.round(pos[0] || volumes.length);
+    if (/UNIDADE AMOSTRAL/.test(lbl)) {
+      const t = pos[pos.length - 1];
+      if (t && t > 0 && t <= 1) tamP = t;
+    }
+  }
+
+  // N correto = ARD / tamP (ignorar N da planilha se baseado em tamP errado)
+  const Nfinal = ard > 0 && tamP > 0 ? ard / tamP : (N || 0);
+  const calc   = calcEstatistica(volumes, tamP, ard, Nfinal);
+
+  return _resultado('AAS', tamP, volumes, uasLanc, uasExig || calc.nNec, calc, ard);
+}
+
+/**
+ * FORMATO B — Análise Estatística (MODESTIA / MALHADA)
+ * Aba: "ANÁLISE ESTATÍSTICA"
+ * Cabeçalho: linha com col0="Unidade Amostral" | "Índice"
+ * Volumes  : col0=UA(int), col1=vol(m³/parcela)
+ * Stats    : lidas a partir de "ANÁLISE ESTATÍSTICA PRELIMINAR" (~L1142+)
+ */
+function lerAnaliseEstatistica(rows) {
+  // Extrair contagem total do texto (ex: "Foram inventariadas 1080 unidades")
+  const mTotal = str((rows[1] || [])[0]).match(/\b(\d{1,5})\s*(unidade|u\.a|amostra)/i);
+  const totalDeclarado = mTotal ? parseInt(mTotal[1]) : 0;
+
+  let iInicio = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const c0 = str((rows[i] || [])[0]).toUpperCase().trim();
+    if (/UNIDADE AMOSTRAL|ÍNDICE|INDICE/.test(c0)) { iInicio = i + 1; break; }
+  }
+  if (iInicio < 0) return null;
+
+  const volumes = [];
+  let iFim = rows.length;
+  for (let i = iInicio; i < rows.length; i++) {
+    const r    = rows[i] || [];
+    const raw0 = str(r[0]).trim();
+    const ua   = num(r[0]);
+    const vol  = num(r[1]);
+    // Parar em linha não-inteira (ANÁLISE ESTATÍSTICA, texto…)
+    if (!ua || !(/^\d+$/.test(raw0))) { iFim = i; break; }
+    // Parar ao atingir o total declarado no texto
+    if (totalDeclarado > 0 && volumes.length >= totalDeclarado) { iFim = i; break; }
+    volumes.push(vol !== null ? vol : 0);
+  }
+  if (!volumes.length) return null;
+
+  let ard = 0, tamP = 0.1, uasLanc = volumes.length, uasExig = 0;
+  let cvLido = 0, eRelLido = 0;
+
+  for (let i = iFim; i < rows.length; i++) {
+    const r   = rows[i] || [];
+    const lbl = str(r[0]).toUpperCase();
+    const pos = r.map(num).filter(v => v !== null && v > 0);
+    if (!pos.length) continue;
+    if (/ÁREA A SER DESMATADA|AREA A SER/.test(lbl))      ard      = num(r[1]) || 0;
+    if (/UNIDADE AMOSTRAL/.test(lbl)) {
+      const t = num(r[3]); if (t && t > 0 && t <= 1) tamP = t;
+    }
+    if (/NÚMERO.*EXIGIDO|NUMERO.*EXIGIDO/.test(lbl))      uasExig  = Math.ceil(num(r[4]) || 0);
+    if (/NÚMERO.*INVENTARIA|NUMERO.*INVENTARIA/.test(lbl)) uasLanc = Math.round(num(r[4]) || volumes.length);
+    if (/COEFICIENTE DE VARIAÇÃO.*CV/.test(lbl))           cvLido  = num(r[2]) || 0;
+    if (/ERRO DE AMOSTRAGEM RELATIVO/.test(lbl))           eRelLido= num(r[2]) || 0;
+  }
+  // Normalizar decimais (0.187 → 18.7%)
+  if (cvLido    > 0 && cvLido    < 2) cvLido    *= 100;
+  if (eRelLido  > 0 && eRelLido  < 2) eRelLido  *= 100;
+
+  const N    = ard > 0 && tamP > 0 ? ard / tamP : 0;
+  const calc = calcEstatistica(volumes, tamP, ard, N);
+  const res  = _resultado('AAS', tamP, volumes, uasLanc, uasExig || calc.nNec, calc, ard);
+  if (cvLido)   res.cv   = cvLido;
+  if (eRelLido) res.eRel = eRelLido;
+  return res;
+}
+
+/**
+ * FORMATO C — Estatística XLS (INVENT_XLS / PALESTINA / INVENT2)
+ * Aba: "Estatística" (com acento)
+ * Cabeçalho L3: col0="Parcela", col1="Volume (m³)", col2="Vol./ha"
+ * Volumes  : col0=parcela(int), col1=vol(m³)
+ * Stats    : lado direito col17=label, col18=valor
+ */
+function lerEstatisticaXLS(rows) {
+  // Encontrar linha de cabeçalho "Parcela" em col0
+  let iInicio = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const c0 = str((rows[i] || [])[0]).trim();
+    if (/^parcela$/i.test(c0)) { iInicio = i + 1; break; }
+  }
+  if (iInicio < 0) return null;
+
+  const volumes = [];
+  let iFim = rows.length;
+  for (let i = iInicio; i < rows.length; i++) {
+    const r  = rows[i] || [];
+    const ua = num(r[0]);
+    const v  = num(r[1]);
+    if (!ua || ua <= 0) { iFim = i; break; }
+    if (v !== null && v >= 0) volumes.push(v);
+  }
+  if (!volumes.length) return null;
+
+  // Ler campos estatísticos do lado direito (col17=label, col18=valor)
+  let ard = 0, N = 0, n_lanc = volumes.length, tamP = 0.1;
+
+  for (let i = 0; i < Math.min(rows.length, 35); i++) {
+    const r   = rows[i] || [];
+    const lbl = str(r[17]).toUpperCase();
+    const val = num(r[18]);
+    if (!val) continue;
+    if (/ÁREA REQUERIDA|AREA REQ/.test(lbl))            ard   = val;
+    if (/TOTAL POTENCI|N.*TOTAL/.test(lbl))             N     = num(r[20]) || val;
+    if (/NÚMERO.*UNIDADES|UNIDADES.*N=/.test(lbl))      n_lanc= Math.round(val);
+    if (/TAMANHO DA PARCELA/.test(str(r[0]).toUpperCase())) {
+      const t = num(r[2]); if (t && t > 0 && t <= 1) tamP = t;
+    }
+  }
+
+  const Nfinal = ard > 0 && tamP > 0 ? ard / tamP : (N || 0);
+  const calc   = calcEstatistica(volumes, tamP, ard, Nfinal);
+  return _resultado('AAS', tamP, volumes, n_lanc || volumes.length, calc.nNec, calc, ard);
+}
+
+/**
+ * FORMATO D — Estatistica sem acento (FLAAVIO MAIA)
+ * Aba: "Estatistica" (sem acento)
+ * Cabeçalho: linha com col0="AMOSTRA"
+ * Volumes  : col0=UA(somente dígitos), col2=vol(m³)
+ * Fallback : aba "Campo", col0=UA, col20=VTcc
+ * tamP     : FORÇADO 0.10 ha (planilha registra errado 500m²)
+ */
+function lerEstatisticaSemAcento(rows, wb) {
+  let iInicio = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (/^AMOSTRA$/i.test(str((rows[i] || [])[0]).trim())) { iInicio = i + 1; break; }
+  }
+  if (iInicio < 0) return null;
+
+  const volumes = [];
+  let iFim = rows.length;
+  for (let i = iInicio; i < rows.length; i++) {
+    const r    = rows[i] || [];
+    const raw0 = str(r[0]).trim();
+    const ua   = num(r[0]);
+    const vol  = num(r[2]);
+    // Apenas linhas onde col0 é inteiro positivo sem texto
+    if (!ua || ua <= 0 || !(/^\d+$/.test(raw0))) { iFim = i; break; }
+    if (vol !== null && vol >= 0) volumes.push(vol);
+  }
+
+  const tamP = 0.10; // 10×100 m — planilha registra 500m² por erro
+  let ard = 0;
+  for (let i = iFim; i < Math.min(rows.length, iFim + 40); i++) {
+    const r   = rows[i] || [];
+    const lbl = str(r[0]).toUpperCase();
+    if (/ÁREA TOTAL|AREA TOTAL/.test(lbl)) { const v = num(r[2]); if (v > 0) ard = v; }
+  }
+
+  let vols = volumes;
+
+  // Fallback: recalcular SUMIF da aba Campo se volumes incompletos
+  if (wb) {
+    const abaCampo = wb.SheetNames.find(n => /^campo$/i.test(n.trim()));
+    if (abaCampo) {
+      const rowsCampo = toRows(wb.Sheets[abaCampo]);
+      const map = new Map();
+      for (let i = 16; i < rowsCampo.length; i++) {
+        const r  = rowsCampo[i] || [];
+        const ua = num(r[0]);
+        const v  = num(r[20]);
+        if (ua > 0 && v > 0) map.set(Math.round(ua), (map.get(Math.round(ua)) || 0) + v);
+      }
+      if (map.size > vols.length) {
+        vols = Array.from(map.entries()).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+      }
+    }
+  }
+  if (!vols.length) return null;
+
+  const N    = ard > 0 ? ard / tamP : 0;
+  const calc = calcEstatistica(vols, tamP, ard, N);
+  return _resultado('AAS', tamP, vols, vols.length, calc.nNec, calc, ard);
+}
+
+/**
+ * FORMATO E — Safira/Analise estatística
+ * Aba: "Analise estatística" (sem til, acento em minúsculo)
+ * Volumes: col0=parcela(int), col1=vol — col3 pode ter texto de CALCULOS na mesma linha
+ * Stats  : col3=label, col6=valor (CALCULOS ao lado)
+ */
+function lerAnaliseSafira(rows) {
+  // Cabeçalho esperado L1: col0="Parcelas", col1="Soma de Volume (m³)"
+  // Dados a partir de L2
+  const iInicio = 1; // pular cabeçalho L1
+  const volumes = [];
+
+  for (let i = iInicio; i < rows.length; i++) {
+    const r   = rows[i] || [];
+    const ua  = num(r[0]);
+    const vol = num(r[1]);
+    // Parcelas reais: col0=inteiro, col1=volume válido
+    if (ua && ua > 0 && Number.isInteger(ua) && vol !== null && vol > 0)
+      volumes.push(vol);
+  }
+  if (!volumes.length) return null;
+
+  let ard = 0, tamP = 0.15, uasLanc = 0, uasExig = 0;
+  for (const r of rows) {
+    const lbl = str(r && r[3]).toLowerCase();
+    const c6  = num(r && r[6]);
+    if (/área total do levant/i.test(lbl) && c6)     ard     = c6;
+    if (/área de cada parcela/i.test(lbl) && c6)     tamP    = c6;
+    if (/número de parcelas invent/i.test(lbl) && c6) uasLanc= Math.round(c6);
+    if (/número ideal de amostras/i.test(lbl) && c6)  uasExig= Math.ceil(c6);
+  }
+
+  const N    = tamP > 0 ? ard / tamP : 0;
+  const calc = calcEstatistica(volumes, tamP, ard, N);
+  return _resultado('AAS', tamP, volumes,
+                    uasLanc || volumes.length, uasExig || calc.nNec, calc, ard);
+}
+
+/**
+ * FORMATO F — Sistemático
+ * Aba: "Plan1" com cabeçalho "INVENTÁRIO SISTEMÁTICO"
+ * Grupos de 100 UAs nas colunas B, E, H, K... (idx 1, 4, 7, 10…)
+ * Cabeçalho linha 6: tamParcela em col1, col4, etc.
+ */
+function lerSistematico(rows) {
+  const row6 = rows[5] || [];
+  let tamP = 0.1;
+  for (const v of row6) { const n = num(v); if (n && n > 0 && n <= 1) { tamP = n; break; } }
+
+  // Detectar grupos com dados (colunas 1, 4, 7, 10…)
+  const COL_VOL_BASE = 1, COL_STEP = 3, LINHA_INI = 6, GRUPO_MAX = 100;
+  const colsVol = [];
+  for (let c = COL_VOL_BASE; c < (row6.length || 90); c += COL_STEP) colsVol.push(c);
+  if (!colsVol.length) for (let c = 1; c < 90; c += 3) colsVol.push(c);
+
+  // Identificar quantos grupos têm dados reais
+  const nGrupos = colsVol.reduce((count, cv, gi) => {
+    for (let r = LINHA_INI; r < LINHA_INI + GRUPO_MAX && r < rows.length; r++) {
+      const v = num((rows[r] || [])[cv]);
+      if (v !== null && v > 0) return gi + 1;
+    }
+    return count;
+  }, 0);
+
+  if (!nGrupos) return null;
+
+  const colsComDados = colsVol.slice(0, nGrupos);
+  const volumes = [];
+  for (let r = LINHA_INI; r < LINHA_INI + GRUPO_MAX && r < rows.length; r++) {
+    const row = rows[r] || [];
+    for (const cv of colsComDados) {
+      const v = num(row[cv]);
+      if (v !== null) volumes.push(v);
+    }
+  }
+  if (!volumes.length) return null;
+
+  // Ler ARD e N da área de parâmetros (~L123)
+  let ard = 0, N = 0, uasLanc = 0, uasExig = 0;
+  for (let i = 110; i < Math.min(rows.length, 155); i++) {
+    const r = rows[i] || [];
+    for (let c = 1; c < r.length; c++) {
+      const v = num(r[c]);
+      if (!v || v <= 1) continue;
+      if (!ard && v > 1 && v < 100000 && (c === 4 || c === 5)) ard = v;
+    }
+    const lbl = str(r[0]).toUpperCase();
+    if (/ÁREA.*TOTAL|AREA.*TOTAL/.test(lbl)) { const v = num(r[4]) || num(r[5]); if (v > 0) ard = v; }
+    if (/TOTAL.*POPUL/.test(lbl))  N       = num(r[4]) || 0;
+    if (/INVENTARIADAS/.test(lbl)) uasLanc = Math.round(num(r[4]) || volumes.length);
+    if (/EXIGIDO/.test(lbl))       uasExig = Math.ceil(num(r[4]) || 0);
+  }
+
+  const Nfinal = ard > 0 && tamP > 0 ? ard / tamP : (N || 0);
+  const calc   = calcEstatistica(volumes, tamP, ard, Nfinal);
+  return _resultado('Sistemático', tamP, volumes,
+                    uasLanc || volumes.length, uasExig || calc.nNec, calc, ard);
+}
+
+/* ── FALLBACK: SUMIF da aba de dados processados (cache incompleto) ── */
+function sumifDadosProc(wb, resultadoParcial) {
+  const aba = wb.SheetNames.find(n => /2\s*_?\s*DADOS\s*PROC|DADOS.PROC/i.test(n));
+  if (!aba) return resultadoParcial;
+
+  const rows    = toRows(wb.Sheets[aba]);
+  const map     = new Map();
+
+  for (let i = 2; i < rows.length; i++) {
+    const r  = rows[i] || [];
+    const ua = num(r[1]);   // col B = UA
+    const v  = num(r[15]);  // col P = VTcc(m³)
+    if (ua > 0 && v > 0) map.set(Math.round(ua), (map.get(Math.round(ua)) || 0) + v);
+  }
+  if (map.size <= (resultadoParcial ? resultadoParcial.n : 0)) return resultadoParcial;
+
+  const vols     = Array.from(map.entries()).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+  const { tamP, ard } = resultadoParcial;
+  const N        = ard > 0 && tamP > 0 ? ard / tamP : 0;
+  const calc     = calcEstatistica(vols, tamP, ard, N);
+  return _resultado('AAS', tamP, vols, vols.length, calc.nNec, calc, ard);
+}
+
+/* ── RESULTADO PADRONIZADO ─────────────────────────────────── */
+function _resultado(formato, tamP, vols, uasLanc, uasExig, calc, ard) {
+  const tamDesc =
+    tamP === 0.05 ? '0,05 ha (10×50 m)'  :
+    tamP === 0.10 ? '0,10 ha (10×100 m)' :
+    tamP === 0.15 ? '0,15 ha (10×150 m)' :
+    (tamP * 10000).toFixed(0) + ' m² (' + tamP.toFixed(2) + ' ha)';
+
+  return {
+    formato, tamP, tamDesc,
+    n:      vols.length,
+    uasLanc: Math.round(uasLanc) || vols.length,
+    uasExig: Math.round(uasExig),
+    cv:      +calc.cv.toFixed(2),
+    eRel:    +calc.eRel.toFixed(2),
+    volHa:   +calc.volHa.toFixed(4),
+    LE:      calc.LE,
+    intNec:  +calc.intNec.toFixed(2),
+    intReal: +calc.intReal.toFixed(2),
+    areaAmostrada: +calc.areaAmostrada.toFixed(4),
+    aprovado: calc.eRel <= calc.LE,
+    ard
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+ *  LEITORES DE VOLUMETRIA
+ * ══════════════════════════════════════════════════════════════ */
+
+/**
+ * RESUMO DO MATERIAL LENHOSO — abas CLASS MATERIAL LENHOSO
+ * Encontra o cabeçalho "Utilidade | st | m³ | total m³" e lê Lenha/Lapidado/Serraria
+ */
+function lerResumoClassMaterial(rows) {
+  // Encontrar cabeçalho do resumo:
+  // Contém "Utilidade" ou "Unidade" + "st", mas NÃO tem "Espécie" nem "Vol. Com." (tabela de espécies)
+  let iHdr = -1;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const txt = (rows[i] || []).map(v => str(v).toLowerCase()).join(' ');
+    if (/\b(utilidade|unidade)\b/.test(txt) && /\bst\b/.test(txt) &&
+        !/espécie|especie|vol\. com|cód\./.test(txt)) { iHdr = i; break; }
+  }
+  if (iHdr < 0) return null;
+
+  const hdr = rows[iHdr] || [];
+  let colSt = -1, colM3 = -1, colTotM3 = -1;
+  hdr.forEach((v, i) => {
+    const s = str(v).toLowerCase().trim();
+    if (s === 'st')                                        colSt    = i;
+    if (/total\s*\(?\s*m[³3]\s*\)?/.test(s))               colTotM3 = i;
+    else if (/^m[³3]$|^\(?\s*m[³3]\s*\)?$/.test(s) && colM3 < 0) colM3 = i;
+  });
+  const colM3Lenha    = colTotM3 >= 0 ? colTotM3 : colM3;
+  const colM3LapSerr  = colM3    >= 0 ? colM3    : colTotM3;
+
+  let lenha_m3 = 0, lenha_st = 0, lap_m3 = 0, tora_m3 = 0;
+
+  for (let i = iHdr + 1; i < Math.min(rows.length, iHdr + 12); i++) {
+    const row = rows[i] || [];
+    // Junta as 5 primeiras colunas para encontrar o rótulo (Lenha/Lapidado/Serraria)
+    // — em alguns formatos o rótulo está em col0, em outros em col3 ou col4.
+    const lbl = (str(row[0]) + ' ' + str(row[1]) + ' ' + str(row[2]) + ' ' +
+                 str(row[3]) + ' ' + str(row[4])).toUpperCase();
+    if (!lbl.trim()) continue;
+
+    if (/\bLENHA\b/.test(lbl) && !/LAPID|SERR|PRES|TOTAL/.test(lbl)) {
+      if (colSt >= 0)      lenha_st  = num(row[colSt])      || 0;
+      if (colM3Lenha >= 0) lenha_m3  = num(row[colM3Lenha]) || 0;
+      if (!lenha_st && !lenha_m3) {
+        const ns = row.map(num).filter(v => v !== null && v > 0).sort((a, b) => b - a);
+        if (ns.length >= 2) { lenha_st = ns[0]; lenha_m3 = ns[ns.length - 1]; }
+        else if (ns.length === 1) lenha_m3 = ns[0];
+      }
+      // Garantia física: st > m³
+      if (lenha_m3 > lenha_st && lenha_st > 0)
+        [lenha_m3, lenha_st] = [lenha_st, lenha_m3];
+    }
+    if (/LAPIDADO/.test(lbl) && !/TOTAL/.test(lbl)) {
+      const ns = row.map(num).filter(v => v !== null && v > 0);
+      if (colM3LapSerr >= 0) lap_m3 = num(row[colM3LapSerr]) || ns[0] || 0;
+      else lap_m3 = ns[0] || 0;
+    }
+    if (/SERRARIA/.test(lbl) && !/TOTAL/.test(lbl)) {
+      const ns = row.map(num).filter(v => v !== null && v > 0);
+      if (ns.length > 0) tora_m3 = ns[0];  // só sobrescreve se achar valor
+    }
+  }
+  return _vol(lenha_m3, lenha_st, lap_m3, tora_m3);
+}
+
+/**
+ * CLASSIFICAÇÃO DO MATERIAL — abas XLS (INVENT_XLS / PALESTINA / INVENT2)
+ * Linha TOTAL: col0 ou col1='TOTAL'
+ * col20=lenha m³, col21=lenha st(galhos), col25=tora m³
+ */
+function lerClassificacaoMaterial(rows) {
+  for (const row of rows) {
+    if (!row) continue;
+    const lbl = str(row[0]).toUpperCase().trim();
+    const lb1 = str(row[1]).toUpperCase().trim();
+    if (lbl !== 'TOTAL' && lb1 !== 'TOTAL') continue;
+    const vl    = num(row[20]) || 0;
+    const vgl   = num(row[21]) || 0;
+    const vtora = num(row[25]) || 0;
+    if (vl > 0) {
+      const st = vgl > 0 ? +(vl + vgl).toFixed(4) : +(vl * 1.5).toFixed(4);
+      return _vol(vl, st, 0, vtora);
+    }
+  }
+  return null;
+}
+
+/**
+ * DECLARAÇÃO FLORESTAL — dois subformatos:
+ *
+ * Subformato 1 (MALHADA): DIVERSAS (LENHA) + IMUNES AO CORTE (SERRERIA/TORA)
+ *   col4=Volume total m³, col5=Volume total st
+ *
+ * Subformato 2 (Safira): IMUNES DE CORTE (ignorar) + FRUTÍFERAS (ignorar) + LENHA
+ *   col3=m³, col4=st
+ *
+ * Subformato 3 (MODESTIA/JOEL): LENHA + RESÍDUO + LAPIDADO + SERRARIA
+ *   col4=VT m³, col5=VT st
+ */
+function lerDeclaracaoFlorestal(rows) {
+  // Detectar subformato pela primeira seção
+  const primeiros = rows.slice(0, 10).map(r => str((r || [])[0]).toUpperCase().trim());
+  const temDiversas = primeiros.some(l => /DIVERSAS.*LENHA|LENHA.*DIVERSAS/.test(l));
+  const temResumo   = rows.slice(0, 5).some(r => /RESUMO FLORESTAL/i.test(str((r || [])[7])));
+  const temImunes   = primeiros.some(l => /^IMUNES DE CORTE/.test(l));
+  const temFrutif   = primeiros.some(l => /FRUTÍFERA|FRUTIFERAS/.test(l));
+
+  let lenha_m3 = 0, lenha_st = 0, lap_m3 = 0, tora_m3 = 0;
+  let secao = '';
+
+  if (temDiversas || temResumo) {
+    // ── Subformato 1: MALHADA — col4=m³, col5=st ──────────────
+    for (const row of rows) {
+      if (!row) continue;
+      const lbl = str(row[0]).toUpperCase().trim();
+      if (/^DIVERSAS|DIVERSAS.*LENHA/.test(lbl))            { secao = 'LENHA';    continue; }
+      if (/IMUNES AO CORTE.*SERR|IMUNES.*TORA/i.test(lbl)) { secao = 'TORA';     continue; }
+      if (/^LAPIDADO/.test(lbl))                             { secao = 'LAPIDADO'; continue; }
+      if (/^SERRARIA$/.test(lbl))                            { secao = 'SERRARIA'; continue; }
+      if (/^IMUNE AO CORTE$/.test(lbl))                     { secao = 'IGNORAR';  continue; }
+      if (!/^TOTAL$/.test(lbl)) continue;
+      const m3 = num(row[4]), st = num(row[5]);
+      if (secao === 'LENHA'    && m3 > 0) { lenha_m3 = m3; lenha_st = st || +(m3 * 1.5).toFixed(4); }
+      if (secao === 'TORA'     && m3 > 0)   tora_m3 += m3;
+      if (secao === 'LAPIDADO' && m3 > 0)   lap_m3  += m3;
+      if (secao === 'SERRARIA' && m3 > 0)   tora_m3 += m3;
+      secao = '';
+    }
+  } else if (temImunes || temFrutif) {
+    // ── Subformato 2: Safira — col3=m³, col4=st ───────────────
+    for (const row of rows) {
+      if (!row) continue;
+      const lbl = str(row[0]).toUpperCase().trim();
+      if (/^LENHA$/.test(lbl))                              { secao = 'LENHA';    continue; }
+      if (/^LAPIDADOS?$/.test(lbl))                         { secao = 'LAPIDADO'; continue; }
+      if (/^SERRARIA$/.test(lbl))                           { secao = 'SERRARIA'; continue; }
+      if (/^IMUNE|FRUTÍFERA|FRUTIFERAS/i.test(lbl))        { secao = 'IGNORAR';  continue; }
+      if (!/^TOTAL$/.test(lbl)) continue;
+      const m3 = num(row[3]), st = num(row[4]);
+      if (secao === 'LENHA'    && m3 > 0) { lenha_m3 = m3; lenha_st = st || +(m3 * 1.5).toFixed(4); }
+      if (secao === 'LAPIDADO' && m3 > 0)   lap_m3  = m3;
+      if (secao === 'SERRARIA' && m3 > 0)   tora_m3 = m3;
+      secao = '';
+    }
+  } else {
+    // ── Subformato 3: MODESTIA/JOEL — col4=m³, col5=st ────────
+    for (const row of rows) {
+      if (!row) continue;
+      const lbl0 = str(row[0]).toUpperCase().trim();
+      const lbl1 = str(row[1]).toUpperCase().trim();
+      if (lbl0 === 'LENHA')          { secao = 'LENHA';    continue; }
+      if (lbl0 === 'RESÍDUO' || lbl0 === 'RESIDUO') { secao = 'RESIDUO'; continue; }
+      if (lbl0 === 'LAPIDADO')       { secao = 'LAPIDADO'; continue; }
+      if (lbl0 === 'SERRARIA')       { secao = 'SERRARIA'; continue; }
+      if (lbl0 === 'IMUNE AO CORTE') { secao = 'IGNORAR';  continue; }
+      // Linha mestra TOTAL (LENHA + RESÍDUO) — sobrescreve subtotais
+      if (/TOTAL.*LENHA.*RESÍDUO|TOTAL.*LENHA\s*\+/i.test(lbl0 + lbl1)) {
+        const m3 = num(row[4]), st = num(row[5]);
+        if (m3 > 0) { lenha_m3 = m3; lenha_st = st || lenha_st; }
+        secao = ''; continue;
+      }
+      if (lbl0 !== 'TOTAL') continue;
+      const m3 = num(row[4]), st = num(row[5]);
+      if (secao === 'LENHA'   && m3 > 0 && !lenha_m3) { lenha_m3 = m3; lenha_st = st || 0; }
+      if (secao === 'RESIDUO' && m3 > 0) { lenha_m3 += m3; lenha_st += (st || 0); }
+      if (secao === 'LAPIDADO'&& m3 > 0) lap_m3  = m3;
+      if (secao === 'SERRARIA'&& m3 > 0) tora_m3 = m3;
+      secao = '';
+    }
+    if (lenha_m3 > 0 && !lenha_st) lenha_st = +(lenha_m3 * 1.5).toFixed(4);
+  }
+  return lenha_m3 > 0 ? _vol(lenha_m3, lenha_st, lap_m3, tora_m3) : null;
+}
+
+/**
+ * QUADRO RESUMO (FLAAVIO MAIA)
+ * Seções em col0/col1: LENHA, LAPIDADOS, Serraria, ESPÉCIES PROTEGIDAS
+ * Valores em col2 (Volume Total)
+ */
+function lerQuadroResumo(rows) {
+  let lenha_m3 = 0, lap_m3 = 0, tora_m3 = 0;
+  let secao = '';
+  for (const row of rows) {
+    if (!row) continue;
+    const lbl0 = str(row[0]).toUpperCase().trim();
+    const lbl1 = str(row[1]).toUpperCase().trim();
+    const v    = num(row[2]);
+    if (lbl1 === 'LENHA'    || lbl0 === 'LENHA')    { secao = 'LENHA';    continue; }
+    if (lbl1 === 'LAPIDADOS'|| lbl0 === 'LAPIDADOS') { secao = 'LAPIDADO'; continue; }
+    if (/^SERRARIA$/.test(lbl1) || /^SERRARIA$/.test(lbl0))    { secao = 'SERRARIA'; continue; }
+    if (/ESPÉCIES PROTEGIDAS|ESPECIES PROTEGIDAS/.test(lbl0 + lbl1)) { secao = 'PROTEG'; continue; }
+    if (/^TOTAIS$/.test(lbl0) || /^TOTAIS$/.test(lbl1)) break;
+    if (!v || v <= 0) continue;
+    if (secao === 'LENHA')    lenha_m3 += v;
+    if (secao === 'LAPIDADO') lap_m3   += v;
+    if (secao === 'SERRARIA') tora_m3  += v;
+    if (secao === 'PROTEG')   lap_m3   += v;
+  }
+  return lenha_m3 > 0
+    ? _vol(lenha_m3, +(lenha_m3 * 1.5).toFixed(4), lap_m3, tora_m3)
+    : null;
+}
+
+function _vol(m3, st, lap, tora) {
+  return {
+    vol_lenha_m3: +m3.toFixed(4),
+    vol_lenha_st:  +st.toFixed(4),
+    vol_lap_m3:    +lap.toFixed(4),
+    vol_tora_m3:   +tora.toFixed(4)
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+ *  ORQUESTRADORES PRINCIPAIS
+ * ══════════════════════════════════════════════════════════════ */
+
+/**
+ * Lê os dados estatísticos do inventário de um workbook.
+ * Tenta cada formato em ordem de prioridade.
+ */
+function lerInventario(wb) {
+  const S = wb.SheetNames;
+
+  // ── Formato A: AAS padrão ──────────────────────────────────
+  const abaAAS = S.find(n => /3\s*_?\s*IF\s*AAS|IF\s*AAS|IF Amostral/i.test(n));
+  if (abaAAS) {
+    const rows = toRows(wb.Sheets[abaAAS]);
+    let res = lerAAS(rows);
+    if (res) {
+      // Fallback SUMIF se cache incompleto
+      const nEsp = _contarUAsTexto(rows);
+      if (nEsp > 0 && res.n < nEsp) res = sumifDadosProc(wb, res) || res;
+      return res;
+    }
+  }
+
+  // ── Formato B: ANÁLISE ESTATÍSTICA (MODESTIA / MALHADA) ───
+  const abaAE = S.find(n => /^ANÁLISE ESTATÍSTICA$|^ANALISE ESTATISTICA$/i.test(n.trim()));
+  if (abaAE) return lerAnaliseEstatistica(toRows(wb.Sheets[abaAE]));
+
+  // ── Formato C: Estatística COM acento XLS ─────────────────
+  const abaEAc = S.find(n => n.trim() === 'Estatística' || n.trim() === 'ESTATÍSTICA');
+  if (abaEAc) {
+    const rows = toRows(wb.Sheets[abaEAc]);
+    const temParcela = rows.slice(0, 6).some(r => /^parcela$/i.test(str((r || [])[0]).trim()));
+    if (temParcela) return lerEstatisticaXLS(rows);
+  }
+
+  // ── Formato D: Estatistica SEM acento (FLAAVIO) ───────────
+  const abaEsc = S.find(n => n.trim() === 'Estatistica' || n.trim() === 'ESTATISTICA');
+  if (abaEsc) return lerEstatisticaSemAcento(toRows(wb.Sheets[abaEsc]), wb);
+
+  // ── Formato E: Analise estatística (Safira) ───────────────
+  const abaSaf = S.find(n => /analise.estat/i.test(n));
+  if (abaSaf) {
+    const rows = toRows(wb.Sheets[abaSaf]);
+    // Safira: col3="CALCULOS" na L5 + col6=valores
+    const isSafira = rows.slice(0, 8).some(r => /^CALCULOS$/i.test(str((r || [])[3]).trim()));
+    if (isSafira) return lerAnaliseSafira(rows);
+    return lerAAS(rows); // fallback para AAS se estrutura diferente
+  }
+
+  // ── Formato F: Sistemático ────────────────────────────────
+  const abaSis = S.find(n => /plan.?1/i.test(n));
+  if (abaSis) {
+    const rows = toRows(wb.Sheets[abaSis]);
+    if (/SISTEMÁTIC|SISTEMATIC/i.test(str((rows[0] || [])[0])))
+      return lerSistematico(rows);
+  }
+
+  // ── Fallback: varrer todas as abas procurando U.A.(n) ─────
+  for (const nome of S) {
+    const res = lerAAS(toRows(wb.Sheets[nome]));
+    if (res && res.n > 0) return res;
+  }
+  return null;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════
+ *  LEITORES ESPECÍFICOS PARA PLANILHAS DE CENSO 100% (ACAIO/ACAIM/AEFS)
+ *  Cobrem formatos onde o material não tem a coluna "Utilidade" (C/S/L)
+ *  e por isso não são lidos por lerResumoClassMaterial:
+ *    - SORTIMENTO (CENSO padilha): coluna "Util. Especie" textual
+ *    - PLANILHA SINAFLOR: coluna "Produto" + "Volume" linha a linha
+ *    - PLANILHA FINAL Cargill: tabela única com VT (m³) e VT (st)
+ * ════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * SORTIMENTO (CENSO padilha):
+ *   Linha 0: ['Cód. Esp.','Ord.','Espécie','Nome Cientifico','Util. Especie',
+ *             'Vol. Com.','Vol. de Galhos','Vol.Total m³','Vol. Total (St)','Vol. Com.Tora/Mourões (m³)']
+ *   Linhas seguintes: dados; coluna 4 = utilidade textual
+ *     Valores possíveis: "Lenha (st)" / "Tora (m³)" / "Mourões (m³)" / "Lapidado" / "Serraria"
+ *   Volumes em colunas 7 (m³) e 8 (st); col 9 = vol. tora/mourão (m³).
+ *   RESUMO no final em col 4 = "Lenha"/"Mourão"/"Tora"/"Lapidado" e cols 5(st)/6(m³)/7(total m³)
+ */
+function lerSortimentoCenso(rows) {
+  if (!rows || rows.length < 2) return null;
+  // Confirma cabeçalho
+  const hdr = (rows[0] || []).map(c => str(c).toLowerCase().trim());
+  const idxUtil = hdr.findIndex(c => /^util/.test(c));
+  const idxM3   = hdr.findIndex(c => /vol\.?total m\u00b3|vol\.\s*total\s*m3|vol\s*total\s*m³/.test(c));
+  const idxST   = hdr.findIndex(c => /vol\.?total\s*\(st\)|vol\s*total\s*\(st\)/.test(c));
+  const idxTora = hdr.findIndex(c => /tora.*mour|mour.*tora/.test(c));
+  if (idxUtil < 0 || idxM3 < 0) return null;
+
+  let lenha_m3 = 0, lenha_st = 0, lap_m3 = 0, tora_m3 = 0;
+
+  // ── 1) Primeira tentativa: RESUMO DO MATERIAL LENHOSO no final ──
+  // Procura linha de cabeçalho do resumo ("Utilidade" + "st") e mapeia colunas dinamicamente.
+  // Layouts conhecidos:
+  //   • [_,_,_,_,'Utilidade','st','m³','total m³',_,_]  (padilha — Lenha tem só st+total m³)
+  //   • [_,_,'Utilidade',_,'st','m³','TOTAL (m³)',_]    (variantes)
+  let usouResumo = false;
+  for (let i = 0; i < rows.length - 1; i++) {
+    const r = rows[i] || [];
+    // Procura "Utilidade" ou "Unidade" em qualquer das colunas iniciais
+    let colLbl = -1;
+    for (let c = 0; c < Math.min(r.length, 8); c++) {
+      const v = str(r[c]).toLowerCase().trim();
+      if (v === 'utilidade' || v === 'unidade') { colLbl = c; break; }
+    }
+    if (colLbl < 0) continue;
+
+    // Confirma que essa linha tem 'st' (cabeçalho de resumo, não a tabela principal)
+    const txtLinha = r.map(v => str(v).toLowerCase()).join(' ');
+    if (!/\bst\b/.test(txtLinha)) continue;
+
+    // Mapeia as colunas do resumo a partir do cabeçalho
+    let cSt = -1, cM3 = -1, cTotM3 = -1;
+    r.forEach((v, idx) => {
+      const s = str(v).toLowerCase().trim();
+      if (s === 'st') cSt = idx;
+      if (/^total\s*\(?\s*m[³3]\s*\)?$/.test(s)) cTotM3 = idx;
+      else if (/^\(?\s*m[³3]\s*\)?$/.test(s) && cM3 < 0) cM3 = idx;
+    });
+    // Coluna efetiva de m³ para cada tipo
+    const colM3Eff = (val) => {
+      // Se valor da coluna m³ pura existe e > 0, usa ela; senão fallback para total m³
+      if (cM3 >= 0 && val[cM3] != null && num(val[cM3]) > 0) return num(val[cM3]);
+      if (cTotM3 >= 0 && val[cTotM3] != null) return num(val[cTotM3]) || 0;
+      if (cM3 >= 0) return num(val[cM3]) || 0;
+      return 0;
+    };
+
+    // Lê linhas seguintes (Lenha / Lapidado / Tora / Mourão / Serraria / Preservação)
+    for (let j = i + 1; j < Math.min(rows.length, i + 10); j++) {
+      const rr = rows[j] || [];
+      const tipo = str(rr[colLbl]).toUpperCase().trim();
+      if (tipo === 'TOTAL' || tipo === '') continue;
+      const vst = cSt    >= 0 ? (num(rr[cSt])    || 0) : 0;
+      const vm3 = colM3Eff(rr);
+      if (tipo === 'LENHA')                              { lenha_st += vst; lenha_m3 += vm3; usouResumo = true; }
+      else if (/^LAPIDADO/.test(tipo))                   { lap_m3   += vm3; usouResumo = true; }
+      else if (/^(TORA|SERRARIA|MOUR[ÃA]O|ESTACA)$/.test(tipo)) {
+                                                           tora_m3  += vm3; usouResumo = true; }
+      else if (/^PRESERVA/.test(tipo)) { /* ignora */ }
+    }
+    break;
+  }
+
+  // ── 2) Se não achou resumo, soma linha-a-linha pela coluna Util. Especie ──
+  if (!usouResumo) {
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i] || [];
+      const util = str(r[idxUtil]).toUpperCase().trim();
+      if (!util || util === 'TOTAL') continue;
+      const m3 = num(r[idxM3]) || 0;
+      const st = idxST >= 0 ? (num(r[idxST]) || 0) : 0;
+      const ttora = idxTora >= 0 ? (num(r[idxTora]) || 0) : 0;
+      if (m3 <= 0) continue;
+      if (/LENHA/.test(util))               { lenha_m3 += m3; lenha_st += st; }
+      else if (/LAPIDAD/.test(util))        { lap_m3   += m3; }
+      else if (/TORA|SERRARIA|MOUR/.test(util)) { tora_m3 += (ttora > 0 ? ttora : m3); }
+    }
+  }
+
+  if (lenha_m3 === 0 && lenha_st === 0 && lap_m3 === 0 && tora_m3 === 0) return null;
+  // Conversões físicas quando uma das unidades está ausente
+  if (lenha_m3 > 0 && lenha_st === 0) lenha_st = +(lenha_m3 * 1.5).toFixed(4);
+  if (lenha_st > 0 && lenha_m3 === 0) lenha_m3 = +(lenha_st / 1.5).toFixed(4);
+  return _vol(lenha_m3, lenha_st, lap_m3, tora_m3);
+}
+
+/**
+ * PLANILHA ANEXADA AO SINAFLOR:
+ *   Header: Produto | Nome Científico | Nome Popular | Latitude | Longitude | DAP(m) | Altura(m) | Volume
+ *   Coluna "Produto" tem valores agrupadores: "Lenha (st)", "Tora (m³)", "Lapidado", etc.
+ *   Soma "Volume" por produto.
+ */
+function lerSinaflor(rows) {
+  if (!rows || rows.length < 2) return null;
+  const hdr = (rows[0] || []).map(c => str(c).toLowerCase().trim());
+  const idxProd = hdr.findIndex(c => /^produto$/.test(c));
+  const idxVol  = hdr.findIndex(c => /^volume$/.test(c));
+  if (idxProd < 0 || idxVol < 0) return null;
+
+  let lenha_m3 = 0, lenha_st = 0, lap_m3 = 0, tora_m3 = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const prod = str(r[idxProd]).toUpperCase().trim();
+    const vol  = num(r[idxVol]) || 0;
+    if (!prod || vol <= 0) continue;
+
+    // Distingue m³ vs st pela unidade do nome do produto
+    const isST = /\(ST\)|\bST\b/i.test(prod);
+    const isM3 = /\(M\u00b3\)|\(M3\)|\bM\u00b3\b|\bM3\b/i.test(prod);
+
+    if (/LENHA/.test(prod)) {
+      if (isST) lenha_st += vol;
+      else      lenha_m3 += vol;
+    } else if (/LAPIDAD/.test(prod)) {
+      lap_m3 += vol;
+    } else if (/TORA|SERRARIA|MOUR/.test(prod)) {
+      tora_m3 += vol;
+    }
+  }
+
+  if (lenha_m3 === 0 && lenha_st === 0 && lap_m3 === 0 && tora_m3 === 0) return null;
+  // Se só tem st, calcula m³ aproximado (st ÷ 1.5); se só tem m³, calcula st (m³ × 1.5)
+  if (lenha_m3 === 0 && lenha_st > 0) lenha_m3 = +(lenha_st / 1.5).toFixed(4);
+  if (lenha_st === 0 && lenha_m3 > 0) lenha_st = +(lenha_m3 * 1.5).toFixed(4);
+  return _vol(lenha_m3, lenha_st, lap_m3, tora_m3);
+}
+
+/**
+ * PLANILHA FINAL (Cargill — censo arbóreo simples):
+ *   Header em linha 1: ['Espécie','NI','VC (m³)','VG (m³)','VT (m³)','VT (st)']
+ *   Última linha "Total Geral" com soma.
+ *   Sem coluna de utilidade → todos os volumes vão para LENHA por padrão
+ *   (planilha de censo de árvores frutíferas / urbanas).
+ */
+function lerPlanilhaFinalCargill(rows) {
+  if (!rows || rows.length < 3) return null;
+  // Procura cabeçalho
+  let idxHdr = -1, cols = {};
+  for (let i = 0; i < Math.min(4, rows.length); i++) {
+    const r = (rows[i] || []).map(c => str(c).toLowerCase().trim());
+    const iEsp = r.findIndex(c => /^esp[ée]cie$/.test(c));
+    const iVT  = r.findIndex(c => /^vt\s*\(m\u00b3\)$|^vt\s*\(m3\)$/.test(c));
+    const iVTst= r.findIndex(c => /^vt\s*\(st\)$/.test(c));
+    if (iEsp >= 0 && iVT >= 0) {
+      idxHdr = i;
+      cols = { esp: iEsp, vt: iVT, vtst: iVTst };
+      break;
+    }
+  }
+  if (idxHdr < 0) return null;
+
+  // Procura linha "Total Geral"
+  let m3 = 0, st = 0;
+  for (let i = idxHdr + 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const lbl = str(r[cols.esp]).toUpperCase().trim();
+    if (/^TOTAL\s*GERAL$|^TOTAL$/.test(lbl)) {
+      m3 = num(r[cols.vt])   || 0;
+      st = cols.vtst >= 0 ? (num(r[cols.vtst]) || 0) : 0;
+      break;
+    }
+  }
+  // Se não encontrou Total Geral, soma manualmente
+  if (m3 === 0) {
+    for (let i = idxHdr + 1; i < rows.length; i++) {
+      const r = rows[i] || [];
+      const lbl = str(r[cols.esp]).toUpperCase().trim();
+      if (/^TOTAL/.test(lbl) || !lbl) continue;
+      m3 += num(r[cols.vt]) || 0;
+      if (cols.vtst >= 0) st += num(r[cols.vtst]) || 0;
+    }
+  }
+  if (m3 <= 0) return null;
+  if (st <= 0) st = +(m3 * 1.5).toFixed(4);
+  return _vol(m3, st, 0, 0);
+}
+
+/**
+ * Orquestrador extra para planilhas de censo (ACAIO/ACAIM/AEFS).
+ * Tenta os formatos que não estão cobertos por lerVolumesPlano.
+ */
+function lerVolumesCensoExtra(wb) {
+  const S = wb.SheetNames;
+
+  // ── SORTIMENTO ──
+  const abaSort = S.find(n => /^SORTIMENTO$/i.test(n.trim()));
+  if (abaSort) {
+    const v = lerSortimentoCenso(toRows(wb.Sheets[abaSort]));
+    if (v) return v;
+  }
+
+  // ── PLANILHA ANEXADA AO SINAFLOR ──
+  const abaSnf = S.find(n => /SINAFLOR/i.test(n));
+  if (abaSnf) {
+    const v = lerSinaflor(toRows(wb.Sheets[abaSnf]));
+    if (v) return v;
+  }
+
+  // ── PLANILHA FINAL (Cargill) ──
+  const abaPF = S.find(n => /^PLANILHA\s*FINAL$/i.test(n.trim()));
+  if (abaPF) {
+    const v = lerPlanilhaFinalCargill(toRows(wb.Sheets[abaPF]));
+    if (v) return v;
+  }
+
+  // ── Fallback adicional: T.D. (tabela dinâmica) com Total Geral ──
+  const abaTD = S.find(n => /^T\.?D\.?$|^TD$/i.test(n.trim()));
+  if (abaTD) {
+    const v = lerPlanilhaFinalCargill(toRows(wb.Sheets[abaTD]));
+    if (v) return v;
+  }
+
+  return null;
+}
+
+/**
+ * Lê os volumes do material lenhoso de um workbook.
+ */
+function lerVolumesPlano(wb) {
+  const S = wb.SheetNames;
+  const ZERO = _vol(0, 0, 0, 0);
+
+  // ── CLASS MATERIAL LENHOSO (AAS padrão) ──────────────────
+  const abasClass = S.filter(n => /class.*lenhoso|4\s*_?\s*class/i.test(n));
+  for (const aba of abasClass) {
+    const v = lerResumoClassMaterial(toRows(wb.Sheets[aba]));
+    if (v && v.vol_lenha_m3 > 0) return v;
+  }
+
+  // ── DECLARAÇÃO FLORESTAL (MODESTIA / SAFIRA / MALHADA) ───
+  const abaDecl = S.find(n => /DECLARAÇÃO FLORESTAL|DECLARACAO FLORESTAL/i.test(n));
+  if (abaDecl) {
+    const v = lerDeclaracaoFlorestal(toRows(wb.Sheets[abaDecl]));
+    if (v && v.vol_lenha_m3 > 0) return v;
+  }
+
+  // ── CLASSIFICAÇÃO DO MATERIAL (XLS) ──────────────────────
+  const abaClass = S.find(n => /classificação do material/i.test(n));
+  if (abaClass) {
+    const v = lerClassificacaoMaterial(toRows(wb.Sheets[abaClass]));
+    if (v && v.vol_lenha_m3 > 0) return v;
+  }
+
+  // ── QUADRO RESUMO (FLAAVIO MAIA) ─────────────────────────
+  const abaQR = S.find(n => /QUADRO RESUMO/i.test(n));
+  if (abaQR) {
+    const v = lerQuadroResumo(toRows(wb.Sheets[abaQR]));
+    if (v && v.vol_lenha_m3 > 0) return v;
+  }
+
+  return ZERO;
+}
+
+/* ── AUXILIAR ───────────────────────────────────────────────── */
+function _contarUAsTexto(rows) {
+  // Extrai o número de UAs inventariadas do texto da aba (ex: "Foram inventariadas 262 unidades")
+  for (const r of rows.slice(0, 5)) {
+    const m = str((r || [])[0]).match(/\b(\d{1,5})\s*(unidade|u\.a|amostra)/i);
+    if (m) return parseInt(m[1]);
+  }
+  // Também procura na linha "Número de unidades amostrais inventariadas"
+  for (const r of rows) {
+    const lbl = str((r || [])[0]).toUpperCase();
+    if (/INVENTARIADAS/.test(lbl)) {
+      const ns = (r || []).map(num).filter(v => v !== null && v > 0);
+      if (ns.length) return Math.round(ns[0]);
+    }
+  }
+  return 0;
+}
+</script>
+</body>
+</html>
