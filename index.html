@@ -1481,16 +1481,30 @@ function ativarSistema(usuario) {
 
     // Valida token com o servidor
     fetch(API_BASE + '/auth/me', { headers: Session.headers() })
-        .then(r => r.ok ? r.json() : null)
+        .then(r => {
+            if (r.status === 401 || r.status === 403) {
+                Session.limpar(); // token realmente inválido
+                return null;
+            }
+            return r.ok ? r.json() : null;
+        })
         .then(d => {
             if (d && d.usuario) {
                 Session.salvar(token, d.usuario);
                 ativarSistema(d.usuario);
-            } else {
-                Session.limpar(); // token expirado
+            } else if (d === null && Session.token) {
+                // Token pode ainda ser válido — usa dados salvos localmente
+                // e não desloga (pode ser só o servidor dormindo)
+                ativarSistema(usuario);
             }
         })
-        .catch(() => Session.limpar());
+        .catch(() => {
+            // Erro de rede (servidor dormindo) — usa sessão salva localmente
+            // sem forçar novo login
+            if (token && usuario) {
+                ativarSistema(usuario);
+            }
+        });
 })();
 
 // ═══════════════════════════════════════════════════════════════
@@ -1711,19 +1725,38 @@ async function confirmarTrocarSenha() {
 // ═══════════════════════════════════════════════════════════════
 //  INTEGRAÇÃO COM API (SIGAM / CAR) — com token JWT
 // ═══════════════════════════════════════════════════════════════
+// Fetch com timeout estendido (90s) para buscas longas no SIGAM/CAR
+async function fetchComTimeout(url, opcoes, timeoutMs=90000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const r = await fetch(url, { ...opcoes, signal: controller.signal });
+        clearTimeout(timer);
+        return r;
+    } catch(e) {
+        clearTimeout(timer);
+        if (e.name === 'AbortError') throw new Error('A busca demorou muito. O servidor pode estar iniciando — tente novamente em 30 segundos.');
+        throw e;
+    }
+}
+
 async function consultarSIGAMBackend() {
     const ano=v('sigam_ano'), orgao=v('sigam_orgao'), seq=v('sigam_seq');
     const st=document.getElementById('status_busca_sigam');
     if(!ano||!orgao||!seq){ alert('Preencha Ano, Órgão e Sequencial.'); return; }
-    if(!Session.token){ alert('Sessão expirada. Faça login novamente.'); location.reload(); return; }
+    if(!Session.token){ st.innerText='❌ Sessão expirada. Faça login novamente.'; setTimeout(()=>location.reload(),2000); return; }
     st.innerText='⏳ Acessando SIGAM → buscando último requerimento e dados do RT... (~40s)';
     try {
-        const r=await fetch(API_BASE+'/api/buscar-sigam', {
+        const r=await fetchComTimeout(API_BASE+'/api/buscar-sigam', {
             method:'POST',
             headers: Session.headers(),
             body: JSON.stringify({ano, orgao, sequencial:seq}),
         });
-        if(r.status===401){ Session.limpar(); location.reload(); return; }
+        if(r.status===401){
+            st.innerText='❌ Sessão expirada. Faça login novamente.';
+            setTimeout(() => { Session.limpar(); location.reload(); }, 2000);
+            return;
+        }
         const d=await r.json();
         if(d.sucesso){
             const p=(id,val)=>{ const c=document.getElementById(id); if(c&&val) c.value=val; };
@@ -1742,21 +1775,25 @@ async function consultarSIGAMBackend() {
             const preenchidos=[d.resp_tecnico_nome?'RT':'',d.resp_tecnico_cpf?'CPF':'',d.resp_tecnico_email?'E-mail':''].filter(Boolean).join(', ');
             st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' '+preenchidos+'.':' ⚠️ RT não localizado.');
         } else { st.innerText='❌ '+d.mensagem; }
-    } catch(e) { st.innerText='❌ Erro de conexão com a API.'; }
+    } catch(e) { st.innerText='❌ ' + (e.message || 'Erro de conexão com a API.'); }
 }
 
 async function consultarCARBackend() {
     const car=v('q5_num'), st=document.getElementById('status_busca');
     if(!car){ alert('Digite o número do CAR'); return; }
-    if(!Session.token){ alert('Sessão expirada.'); location.reload(); return; }
+    if(!Session.token){ st.innerText='❌ Sessão expirada. Faça login novamente.'; setTimeout(()=>location.reload(),2000); return; }
     st.innerText='⏳ Consultando SIGCAR... aguarde.';
     try {
-        const r=await fetch(API_BASE+'/api/buscar-car', {
+        const r=await fetchComTimeout(API_BASE+'/api/buscar-car', {
             method:'POST',
             headers: Session.headers(),
             body: JSON.stringify({car}),
         });
-        if(r.status===401){ Session.limpar(); location.reload(); return; }
+        if(r.status===401){
+            st.innerText='❌ Sessão expirada. Faça login novamente.';
+            setTimeout(() => { Session.limpar(); location.reload(); }, 2000);
+            return;
+        }
         const d=await r.json();
         if(d.sucesso){
             st.innerText='✅ Dados do CAR recuperados!';
@@ -1775,7 +1812,7 @@ async function consultarCARBackend() {
             p('area_rl_total',d.reserva_legal_total); p('area_rl_recuperar',d.rl_a_recuperar);
             p('area_arl_veg',d.arl_com_vegetacao);
         } else { st.innerText='❌ '+d.mensagem; }
-    } catch(e) { st.innerText='❌ Erro de conexão com a API.'; }
+    } catch(e) { st.innerText='❌ ' + (e.message || 'Erro de conexão com a API.'); }
 }
 
 // Registra o parecer no banco ao gerar (chamado dentro de gerarParecer)
