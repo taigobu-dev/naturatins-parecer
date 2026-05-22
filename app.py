@@ -522,9 +522,22 @@ def listar_pareceres():
     })
 
 
-@app.route("/api/registrar-parecer", methods=["POST"])
-@requer_login
+@app.route("/api/registrar-parecer", methods=["POST", "OPTIONS"])
 def registrar_parecer():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    # Valida autenticação manualmente
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return jsonify({"erro": "Token não fornecido."}), 401
+    try:
+        payload = _validar_token(auth[7:])
+        usuario = db.session.get(Usuario, payload["sub"])
+        if not usuario or not usuario.ativo:
+            return jsonify({"erro": "Usuário inativo."}), 403
+        g.usuario = usuario
+    except jwt.InvalidTokenError:
+        return jsonify({"erro": "Token inválido."}), 401
     """Salva o registro do parecer gerado no banco para auditoria."""
     dados = request.get_json(silent=True) or {}
     parecer = Parecer(
@@ -1210,11 +1223,6 @@ def init_db_manual():
 def health():
     return jsonify({"status": "ok", "service": "naturatins-parecer"})
 
-
-
-@app.route("/api/registrar-parecer", methods=["OPTIONS"])
-def registrar_options():
-    return jsonify({"status": "ok"}), 200
 
 
 # ═══════════════════════════════════════════════════════════════════
