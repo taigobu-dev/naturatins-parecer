@@ -120,6 +120,47 @@
         }
         .btn-admin:hover { background:#0d47a1; }
 
+        /* ══ MODAL TROCAR SENHA ════════════════════════════════════ */
+        #modal-senha {
+            position: fixed; inset: 0; z-index: 9000;
+            background: rgba(0,0,0,.5); display: flex;
+            align-items: center; justify-content: center;
+        }
+        #modal-senha.oculto { display: none; }
+        .senha-card {
+            background: white; border-radius: 14px; padding: 32px 28px;
+            width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+            position: relative;
+        }
+        .senha-card h3 { color: #1a5c1e; font-size: 17px; margin-bottom: 18px; font-weight: 700; }
+        .senha-field { margin-bottom: 14px; }
+        .senha-field label { display:block; font-size:12px; font-weight:700; color:#37474f; margin-bottom:4px; }
+        .senha-field input {
+            width:100%; padding:9px 11px; border:1.5px solid #b0bec5;
+            border-radius:7px; font-size:13.5px; outline:none; transition:border .2s;
+        }
+        .senha-field input:focus { border-color:#1565c0; }
+        .btn-trocar-senha {
+            width:100%; padding:11px; background:#1a5c1e; color:white;
+            border:none; border-radius:7px; font-size:14px; font-weight:700;
+            cursor:pointer; margin-top:4px; transition:background .2s;
+        }
+        .btn-trocar-senha:hover { background:#0d3e10; }
+        .senha-msg { font-size:12.5px; margin-top:10px; min-height:18px; text-align:center; }
+        .senha-msg.ok   { color:#2e7d32; }
+        .senha-msg.erro { color:#c62828; }
+        .btn-fechar-senha {
+            position:absolute; top:14px; right:16px;
+            background:none; border:none; font-size:20px;
+            cursor:pointer; color:#607d8b;
+        }
+        .btn-senha-menu {
+            background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3);
+            color:white; padding:5px 14px; border-radius:5px; cursor:pointer;
+            font-size:12px; font-weight:700; margin-right:8px; transition:background .2s;
+        }
+        .btn-senha-menu:hover { background:rgba(255,255,255,.25); }
+
         /* ══ PAINEL ADMIN ═══════════════════════════════════════════ */
         #painel-admin {
             position: fixed; inset: 0; z-index: 8000;
@@ -288,7 +329,36 @@
   </div>
   <div>
     <button class="btn-admin oculto" id="btn-painel-admin" onclick="abrirAdmin()">⚙️ Admin</button>
+    <button class="btn-senha-menu" onclick="abrirTrocarSenha()">🔑 Trocar Senha</button>
     <button class="btn-logout" onclick="fazerLogout()">Sair</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--                  MODAL TROCAR SENHA                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="modal-senha" class="oculto" onclick="if(event.target===this)fecharTrocarSenha()">
+  <div class="senha-card">
+    <button class="btn-fechar-senha" onclick="fecharTrocarSenha()">✕</button>
+    <h3>🔑 Trocar Senha</h3>
+    <div class="senha-field">
+      <label>Senha atual</label>
+      <input type="password" id="senha_atual" placeholder="••••••••••">
+    </div>
+    <div class="senha-field">
+      <label>Nova senha</label>
+      <input type="password" id="senha_nova" placeholder="Mínimo 10 caracteres">
+    </div>
+    <div class="senha-field">
+      <label>Confirmar nova senha</label>
+      <input type="password" id="senha_confirma" placeholder="Repita a nova senha"
+             onkeydown="if(event.key==='Enter') confirmarTrocarSenha()">
+    </div>
+    <button class="btn-trocar-senha" onclick="confirmarTrocarSenha()">Salvar nova senha</button>
+    <div class="senha-msg" id="senha-msg"></div>
+    <div style="font-size:11.5px;color:#90a4ae;margin-top:12px;line-height:1.5;">
+      A senha precisa ter: mínimo 10 caracteres, 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial (!@#$%...)
+    </div>
   </div>
 </div>
 
@@ -1547,6 +1617,94 @@ async function carregarPareceres() {
     } catch(e) {
         document.getElementById('admin-lista-pareceres').innerHTML =
             '<tr><td colspan="5" style="color:#c62828;">Erro ao carregar.</td></tr>';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TROCAR SENHA
+// ═══════════════════════════════════════════════════════════════
+function abrirTrocarSenha() {
+    document.getElementById('modal-senha').classList.remove('oculto');
+    document.getElementById('senha_atual').value = '';
+    document.getElementById('senha_nova').value = '';
+    document.getElementById('senha_confirma').value = '';
+    document.getElementById('senha-msg').textContent = '';
+    document.getElementById('senha-msg').className = 'senha-msg';
+    setTimeout(() => document.getElementById('senha_atual').focus(), 100);
+}
+function fecharTrocarSenha() {
+    document.getElementById('modal-senha').classList.add('oculto');
+}
+async function confirmarTrocarSenha() {
+    const atual    = document.getElementById('senha_atual').value;
+    const nova     = document.getElementById('senha_nova').value;
+    const confirma = document.getElementById('senha_confirma').value;
+    const msg      = document.getElementById('senha-msg');
+
+    msg.className = 'senha-msg';
+    msg.textContent = '';
+
+    if (!atual || !nova || !confirma) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'Preencha todos os campos.';
+        return;
+    }
+    if (nova !== confirma) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'A nova senha e a confirmação não coincidem.';
+        return;
+    }
+    if (nova.length < 10) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'A nova senha deve ter pelo menos 10 caracteres.';
+        return;
+    }
+    if (!/[A-Z]/.test(nova)) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'A senha precisa ter pelo menos uma letra maiúscula.';
+        return;
+    }
+    if (!/[a-z]/.test(nova)) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'A senha precisa ter pelo menos uma letra minúscula.';
+        return;
+    }
+    if (!/[0-9]/.test(nova)) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'A senha precisa ter pelo menos um número.';
+        return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]/.test(nova)) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'A senha precisa ter pelo menos um caractere especial (!@#$%...).';
+        return;
+    }
+
+    const btn = document.querySelector('.btn-trocar-senha');
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+
+    try {
+        const r = await fetch(API_BASE + '/auth/alterar-senha', {
+            method: 'POST',
+            headers: Session.headers(),
+            body: JSON.stringify({ senha_atual: atual, senha_nova: nova }),
+        });
+        const d = await r.json();
+        if (r.ok) {
+            msg.className = 'senha-msg ok';
+            msg.textContent = '✅ Senha alterada com sucesso!';
+            setTimeout(() => fecharTrocarSenha(), 1500);
+        } else {
+            msg.className = 'senha-msg erro';
+            msg.textContent = d.erro || 'Erro ao alterar senha.';
+        }
+    } catch(e) {
+        msg.className = 'senha-msg erro';
+        msg.textContent = 'Erro de conexão.';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Salvar nova senha';
     }
 }
 
