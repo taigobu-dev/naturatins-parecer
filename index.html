@@ -65,6 +65,104 @@
         .btn-gerar:hover { background: #0d3e10; }
 
         /* ===================== IMPRESSÃO ===================== */
+
+        /* ══ TELA DE LOGIN ══════════════════════════════════════════ */
+        #login-screen {
+            position: fixed; inset: 0; z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #0d3e10 0%, #1a5c1e 50%, #1565c0 100%);
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        #login-screen.oculto { display: none; }
+        .login-card {
+            background: white; border-radius: 16px; padding: 40px 36px;
+            width: 100%; max-width: 400px; box-shadow: 0 24px 64px rgba(0,0,0,.35);
+        }
+        .login-logo { text-align: center; margin-bottom: 28px; }
+        .login-logo h1 { color: #1a5c1e; font-size: 20px; margin: 8px 0 4px; }
+        .login-logo p  { color: #607d8b; font-size: 12px; }
+        .login-field { margin-bottom: 16px; }
+        .login-field label { display:block; font-size:12.5px; font-weight:700; color:#37474f; margin-bottom:5px; }
+        .login-field input {
+            width:100%; padding:10px 12px; border:1.5px solid #b0bec5;
+            border-radius:7px; font-size:14px; outline:none; transition:border .2s;
+        }
+        .login-field input:focus { border-color:#1565c0; }
+        .btn-login {
+            width:100%; padding:12px; background:#1a5c1e; color:white;
+            border:none; border-radius:7px; font-size:15px; font-weight:700;
+            cursor:pointer; margin-top:8px; transition:background .2s;
+        }
+        .btn-login:hover { background:#0d3e10; }
+        .login-erro { color:#c62828; font-size:12.5px; margin-top:10px; text-align:center; min-height:18px; }
+        .login-loading { text-align:center; color:#607d8b; font-size:13px; margin-top:10px; }
+
+        /* ══ BARRA DO USUÁRIO ═══════════════════════════════════════ */
+        #barra-usuario {
+            position: sticky; top: 0; z-index: 100;
+            background: #1a5c1e; color: white;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 20px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.2);
+        }
+        #barra-usuario.oculto { display: none; }
+        .barra-nome { font-weight: 700; }
+        .barra-perfil { font-size:11px; opacity:.8; margin-left:8px; }
+        .btn-logout {
+            background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3);
+            color:white; padding:5px 14px; border-radius:5px; cursor:pointer;
+            font-size:12px; font-weight:700; transition:background .2s;
+        }
+        .btn-logout:hover { background:rgba(255,255,255,.25); }
+        .btn-admin {
+            background:#1565c0; border:none; color:white; padding:5px 14px;
+            border-radius:5px; cursor:pointer; font-size:12px; font-weight:700;
+            margin-right:8px; transition:background .2s;
+        }
+        .btn-admin:hover { background:#0d47a1; }
+
+        /* ══ PAINEL ADMIN ═══════════════════════════════════════════ */
+        #painel-admin {
+            position: fixed; inset: 0; z-index: 8000;
+            background: rgba(0,0,0,.5); display:flex; align-items:flex-start;
+            justify-content:center; padding:20px; overflow-y:auto;
+        }
+        #painel-admin.oculto { display:none; }
+        .admin-modal {
+            background:white; border-radius:12px; padding:28px;
+            width:100%; max-width:760px; margin:auto; position:relative;
+        }
+        .admin-modal h2 { color:#1a5c1e; font-size:16px; margin-bottom:20px; }
+        .admin-tabs { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+        .admin-tab {
+            padding:6px 16px; border-radius:20px; border:1.5px solid #b0bec5;
+            cursor:pointer; font-size:12.5px; font-weight:700; background:white;
+            transition:all .15s;
+        }
+        .admin-tab.ativo { background:#1a5c1e; color:white; border-color:#1a5c1e; }
+        .admin-section { display:none; }
+        .admin-section.ativo { display:block; }
+        .admin-form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+        .admin-form-row input, .admin-form-row select {
+            padding:8px 10px; border:1.5px solid #b0bec5; border-radius:6px; font-size:13px;
+        }
+        .btn-criar-user {
+            background:#1565c0; color:white; border:none; padding:9px 20px;
+            border-radius:6px; cursor:pointer; font-weight:700; font-size:13px;
+        }
+        table.admin-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+        table.admin-table th { background:#eceff1; padding:8px; text-align:left; font-size:11px; }
+        table.admin-table td { padding:8px; border-bottom:1px solid #f1f1f1; }
+        .tag-ativo   { background:#e8f5e9; color:#2e7d32; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+        .tag-inativo { background:#ffebee; color:#c62828; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+        .tag-admin   { background:#e3f2fd; color:#1565c0; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+        .btn-fechar-admin {
+            position:absolute; top:16px; right:16px; background:none; border:none;
+            font-size:20px; cursor:pointer; color:#607d8b;
+        }
+        .admin-msg { font-size:12.5px; margin-top:8px; min-height:18px; }
+        .admin-msg.ok    { color:#2e7d32; }
+        .admin-msg.erro  { color:#c62828; }
+
         @media screen {
             #pdf-content { display: none; }
         }
@@ -153,7 +251,106 @@
 <!-- ============================================================ -->
 <!--                      FORMULÁRIO                             -->
 <!-- ============================================================ -->
-<div id="form-container">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--                     TELA DE LOGIN                         -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div style="font-size:40px;">🌿</div>
+      <h1>NATURATINS</h1>
+      <p>Sistema de Geração de Pareceres Técnicos<br>Acesso restrito a servidores autorizados</p>
+    </div>
+    <div class="login-field">
+      <label>E-mail institucional</label>
+      <input type="email" id="login_email" placeholder="nome@naturatins.to.gov.br"
+             onkeydown="if(event.key==='Enter') fazerLogin()">
+    </div>
+    <div class="login-field">
+      <label>Senha</label>
+      <input type="password" id="login_senha" placeholder="••••••••••"
+             onkeydown="if(event.key==='Enter') fazerLogin()">
+    </div>
+    <button class="btn-login" onclick="fazerLogin()">Entrar</button>
+    <div class="login-erro" id="login_erro"></div>
+    <div class="login-loading oculto" id="login_loading">Verificando credenciais...</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--                  BARRA DO USUÁRIO                         -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="barra-usuario" class="oculto">
+  <div>
+    <span class="barra-nome" id="barra-nome-usuario"></span>
+    <span class="barra-perfil" id="barra-perfil-usuario"></span>
+  </div>
+  <div>
+    <button class="btn-admin oculto" id="btn-painel-admin" onclick="abrirAdmin()">⚙️ Admin</button>
+    <button class="btn-logout" onclick="fazerLogout()">Sair</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--                   PAINEL ADMIN                            -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="painel-admin" class="oculto" onclick="if(event.target===this)fecharAdmin()">
+  <div class="admin-modal">
+    <button class="btn-fechar-admin" onclick="fecharAdmin()">✕</button>
+    <h2>⚙️ Painel do Administrador</h2>
+
+    <div class="admin-tabs">
+      <button class="admin-tab ativo" onclick="abaAdmin('usuarios')">👥 Usuários</button>
+      <button class="admin-tab" onclick="abaAdmin('criar')">➕ Novo Usuário</button>
+      <button class="admin-tab" onclick="abaAdmin('logs')">📋 Logs</button>
+      <button class="admin-tab" onclick="abaAdmin('pareceres')">📄 Pareceres</button>
+    </div>
+
+    <!-- LISTA DE USUÁRIOS -->
+    <div class="admin-section ativo" id="admin-usuarios">
+      <table class="admin-table">
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Último Acesso</th><th>Ação</th></tr></thead>
+        <tbody id="admin-lista-usuarios"><tr><td colspan="6" style="color:#90a4ae;padding:16px;">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- CRIAR USUÁRIO -->
+    <div class="admin-section" id="admin-criar">
+      <div class="admin-form-row">
+        <input type="text" id="novo_nome" placeholder="Nome completo">
+        <input type="email" id="novo_email" placeholder="email@naturatins.to.gov.br">
+      </div>
+      <div class="admin-form-row">
+        <input type="password" id="novo_senha" placeholder="Senha (mín. 10 chars, maiúsc., número, especial)">
+        <select id="novo_perfil">
+          <option value="analista">Analista</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <button class="btn-criar-user" onclick="criarUsuario()">Criar Usuário</button>
+      <div class="admin-msg" id="admin-criar-msg"></div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="admin-section" id="admin-logs">
+      <table class="admin-table">
+        <thead><tr><th>Data/Hora</th><th>Ação</th><th>Usuário</th><th>IP</th><th>Detalhe</th></tr></thead>
+        <tbody id="admin-lista-logs"><tr><td colspan="5" style="color:#90a4ae;padding:16px;">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- PARECERES -->
+    <div class="admin-section" id="admin-pareceres">
+      <table class="admin-table">
+        <thead><tr><th>Data</th><th>Analista</th><th>Processo</th><th>Requerente</th><th>Conclusão</th></tr></thead>
+        <tbody id="admin-lista-pareceres"><tr><td colspan="5" style="color:#90a4ae;padding:16px;">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="form-container" style="display:none;">
 
     <div class="logo-header">
         <div>
@@ -685,95 +882,6 @@ function dataFormatada(dateStr){
     return `${d}/${m}/${y}`;
 }
 
-// ─── Backend API ───────────────────────────────────────────────
-async function consultarSIGAMBackend(){
-    const ano=v('sigam_ano'), orgao=v('sigam_orgao'), seq=v('sigam_seq');
-    const st=document.getElementById('status_busca_sigam');
-    if(!ano||!orgao||!seq){alert('Preencha Ano, Órgão e Sequencial.');return;}
-    st.innerText='⏳ Acessando SIGAM → abrindo documentos juntados → lendo último requerimento... aguarde (~40s).';
-    try{
-        const r=await fetch('http://127.0.0.1:3000/api/buscar-sigam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ano,orgao,sequencial:seq})});
-        const d=await r.json();
-        if(d.sucesso){
-            const p=(id,val)=>{const c=document.getElementById(id);if(c&&val)c.value=val;};
-            p('num_processo',     d.numero_processo);
-            // Preenche número do requerimento: prefere o extraído do documento
-            if(d.num_requerimento_doc) p('num_requerimento', d.num_requerimento_doc);
-            else if(d.numero_requerimento) p('num_requerimento', d.numero_requerimento);
-            p('resp_tecnico',     d.resp_tecnico_nome);
-            p('cpf_resp_tecnico', d.resp_tecnico_cpf);
-            p('email_resp',       d.resp_tecnico_email);
-            p('tel_resp',         d.resp_tecnico_tel);
-            p('titulo_prof',      d.resp_tecnico_formacao);
-            p('art_resp_tecnico', d.resp_tecnico_registro);
-            // Preenche requerente com dados do documento se ainda estiver vazio
-            if(d.nome_requerente_doc) p('nome_requerente', d.nome_requerente_doc);
-            if(d.cpf_requerente_doc)  p('cpf_requerente',  d.cpf_requerente_doc);
-            const preenchidos=[
-                d.resp_tecnico_nome  ?'Resp. Técnico':'',
-                d.resp_tecnico_cpf   ?'CPF':'',
-                d.resp_tecnico_email ?'E-mail':'',
-                d.resp_tecnico_tel   ?'Telefone':'',
-            ].filter(Boolean).join(', ');
-            const reqInfo = d.numero_requerimento ? ' | Req: '+d.numero_requerimento : '';
-            st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' RT: '+preenchidos+'.':' ⚠️ RT não localizado no último requerimento.');
-        }else{ st.innerText='❌ Erro: '+d.mensagem; }
-    }catch(e){ st.innerText='❌ Erro de conexão: o servidor Python está ligado?'; }
-}
-
-async function consultarCARBackend(){
-    const car=v('q5_num'), st=document.getElementById('status_busca');
-    if(!car){alert('Digite o número do CAR');return;}
-    st.innerText='⏳ Puxando dados do SIGCAR... aguarde.';
-    try{
-        const r=await fetch('http://127.0.0.1:3000/api/buscar-car',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({car})});
-        const d=await r.json();
-        if(d.sucesso){
-            st.innerText='✅ Dados recuperados com sucesso!';
-            const p=(id,val)=>{const c=document.getElementById(id);if(c)c.value=val??'';};
-            // Identificação
-            p('status_car_input',       d.status_car);
-            p('q2',                     d.municipio||'');
-            p('nome_imovel',            d.denominacao_imovel||'');
-            p('data_sigcar',            d.data_sigcar||'');
-            p('nome_requerente',        d.nome_requerente);
-            p('cpf_requerente',         d.cpf_requerente);
-            // Áreas principais
-            p('area_escriturada',       d.area_escriturada);
-            p('area_vetorizada',        d.area_vetorizada);
-            p('area_liquida',           d.area_liquida);
-            p('area_remanescente',      d.remanescente);
-            p('area_pousio',            d.pousio);
-            p('area_consolidada',       d.consolidada);
-            p('area_antropizada',       d.antropizada);
-            p('area_uso_alternativo',   d.uso_alternativo);
-            p('area_infra_publica',     d.infra_publica);
-            p('area_utilidade_publica', d.utilidade_publica);
-            p('area_servidao',          d.servidao);
-            // APP
-            p('area_app',               d.app);
-            p('area_app_61a',           d.app_61a);
-            p('area_app_recuperar',     d.app_a_recuperar);
-            // Reserva Legal
-            p('area_rl',                d.reserva_legal);
-            p('area_rl_pct',            d.reserva_legal_pct||'');
-            p('area_rl_suplementar',    d.suplementar);
-            p('area_rl_total',          d.reserva_legal_total);
-            p('area_rl_recuperar',      d.rl_a_recuperar);
-            p('area_arl_veg',           d.arl_com_vegetacao);
-        }else{ st.innerText='❌ Erro: '+d.mensagem; }
-    }catch(e){ st.innerText='❌ Erro: O servidor Python está ligado?'; }
-}
-
-// Preenche a data do parecer com hoje ao abrir a página
-(function(){
-    const c=document.getElementById('data_parecer');
-    if(c&&!c.value){
-        const h=new Date();
-        c.value=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
-    }
-})();
-
 // ─── Análise Documental ────────────────────────────────────────
 function toggleDocPend(pendId, valor){
     const el = document.getElementById(pendId);
@@ -1193,7 +1301,333 @@ function gerarParecer(){
 `;
 
     document.getElementById('pdf-content').innerHTML = html;
+    // Registra o parecer no banco para auditoria
+    registrarParecer({
+        numero_processo: numProcesso,
+        numero_requerimento: numReq,
+        num_parecer: numParecer,
+        requerente: requerente,
+        municipio: municipio,
+        conclusao: conclusao,
+    });
     window.print();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONFIGURAÇÃO DA API
+// ═══════════════════════════════════════════════════════════════
+// Em produção, coloque a URL do seu serviço Render abaixo:
+// const API_BASE = 'https://naturatins-parecer.onrender.com';
+const API_BASE = window.location.hostname === '127.0.0.1' ||
+                 window.location.hostname === 'localhost'
+    ? 'http://127.0.0.1:3000'
+    : 'https://naturatins-parecer.onrender.com';  // ← ALTERE PARA SUA URL
+
+// ═══════════════════════════════════════════════════════════════
+//  GERENCIAMENTO DE SESSÃO
+// ═══════════════════════════════════════════════════════════════
+const Session = {
+    get token()   { return localStorage.getItem('nt_token'); },
+    get usuario() {
+        try { return JSON.parse(localStorage.getItem('nt_usuario')); } catch { return null; }
+    },
+    salvar(token, usuario) {
+        localStorage.setItem('nt_token',   token);
+        localStorage.setItem('nt_usuario', JSON.stringify(usuario));
+    },
+    limpar() {
+        localStorage.removeItem('nt_token');
+        localStorage.removeItem('nt_usuario');
+    },
+    headers() {
+        return {
+            'Content-Type':  'application/json',
+            'Authorization': 'Bearer ' + (this.token || ''),
+        };
+    },
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  LOGIN / LOGOUT
+// ═══════════════════════════════════════════════════════════════
+async function fazerLogin() {
+    const email = document.getElementById('login_email').value.trim();
+    const senha = document.getElementById('login_senha').value;
+    const erroEl   = document.getElementById('login_erro');
+    const loadEl   = document.getElementById('login_loading');
+    erroEl.textContent = '';
+    if (!email || !senha) { erroEl.textContent = 'Preencha e-mail e senha.'; return; }
+
+    loadEl.classList.remove('oculto');
+    document.querySelector('.btn-login').disabled = true;
+
+    try {
+        const r = await fetch(API_BASE + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, senha }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+            erroEl.textContent = d.erro || 'Credenciais inválidas.';
+            return;
+        }
+        Session.salvar(d.token, d.usuario);
+        ativarSistema(d.usuario);
+    } catch(e) {
+        erroEl.textContent = 'Erro de conexão. Verifique se o servidor está online.';
+    } finally {
+        loadEl.classList.add('oculto');
+        document.querySelector('.btn-login').disabled = false;
+    }
+}
+
+async function fazerLogout() {
+    try {
+        await fetch(API_BASE + '/auth/logout', { method:'POST', headers: Session.headers() });
+    } catch {}
+    Session.limpar();
+    location.reload();
+}
+
+function ativarSistema(usuario) {
+    // Esconde login, mostra sistema
+    document.getElementById('login-screen').classList.add('oculto');
+    document.getElementById('barra-usuario').classList.remove('oculto');
+    document.getElementById('form-container').style.display = '';
+    document.getElementById('barra-nome-usuario').textContent = usuario.nome;
+    document.getElementById('barra-perfil-usuario').textContent =
+        usuario.perfil === 'admin' ? '(Administrador)' : '(Analista)';
+    if (usuario.perfil === 'admin') {
+        document.getElementById('btn-painel-admin').classList.remove('oculto');
+    }
+}
+
+// Verifica sessão salva ao carregar a página
+(function verificarSessao() {
+    const token   = Session.token;
+    const usuario = Session.usuario;
+    if (!token || !usuario) return; // exibe login
+
+    // Valida token com o servidor
+    fetch(API_BASE + '/auth/me', { headers: Session.headers() })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+            if (d && d.usuario) {
+                Session.salvar(token, d.usuario);
+                ativarSistema(d.usuario);
+            } else {
+                Session.limpar(); // token expirado
+            }
+        })
+        .catch(() => Session.limpar());
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  PAINEL ADMIN
+// ═══════════════════════════════════════════════════════════════
+function abrirAdmin() {
+    document.getElementById('painel-admin').classList.remove('oculto');
+    carregarUsuarios();
+}
+function fecharAdmin() {
+    document.getElementById('painel-admin').classList.add('oculto');
+}
+function abaAdmin(aba) {
+    document.querySelectorAll('.admin-tab').forEach((t,i) =>
+        t.classList.toggle('ativo', ['usuarios','criar','logs','pareceres'][i] === aba));
+    document.querySelectorAll('.admin-section').forEach((s,i) =>
+        s.classList.toggle('ativo', ['admin-usuarios','admin-criar','admin-logs','admin-pareceres'][i] === 'admin-' + aba));
+    if (aba === 'usuarios') carregarUsuarios();
+    if (aba === 'logs')     carregarLogs();
+    if (aba === 'pareceres') carregarPareceres();
+}
+
+async function carregarUsuarios() {
+    try {
+        const r = await fetch(API_BASE + '/admin/usuarios', { headers: Session.headers() });
+        const d = await r.json();
+        const tb = document.getElementById('admin-lista-usuarios');
+        if (!d.usuarios || !d.usuarios.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#90a4ae;padding:12px;">Nenhum usuário.</td></tr>'; return; }
+        tb.innerHTML = d.usuarios.map(u => `
+            <tr>
+              <td>${u.nome}</td>
+              <td>${u.email}</td>
+              <td>${u.perfil === 'admin' ? '<span class="tag-admin">Admin</span>' : 'Analista'}</td>
+              <td>${u.ativo ? '<span class="tag-ativo">Ativo</span>' : '<span class="tag-inativo">Inativo</span>'}</td>
+              <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '–'}</td>
+              <td>
+                <button onclick="toggleUsuario(${u.id}, ${u.ativo})"
+                  style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #b0bec5;cursor:pointer;background:white;">
+                  ${u.ativo ? 'Desativar' : 'Ativar'}
+                </button>
+              </td>
+            </tr>`).join('');
+    } catch(e) {
+        document.getElementById('admin-lista-usuarios').innerHTML =
+            '<tr><td colspan="6" style="color:#c62828;">Erro ao carregar.</td></tr>';
+    }
+}
+
+async function toggleUsuario(id, ativo) {
+    if (!confirm(ativo ? 'Desativar este usuário?' : 'Ativar este usuário?')) return;
+    try {
+        const r = await fetch(API_BASE + '/admin/usuarios/' + id, {
+            method: 'PATCH', headers: Session.headers(),
+            body: JSON.stringify({ ativo: !ativo }),
+        });
+        if (r.ok) carregarUsuarios();
+        else { const d = await r.json(); alert(d.erro || 'Erro.'); }
+    } catch(e) { alert('Erro de conexão.'); }
+}
+
+async function criarUsuario() {
+    const msg = document.getElementById('admin-criar-msg');
+    const dados = {
+        nome:   document.getElementById('novo_nome').value.trim(),
+        email:  document.getElementById('novo_email').value.trim(),
+        senha:  document.getElementById('novo_senha').value,
+        perfil: document.getElementById('novo_perfil').value,
+    };
+    if (!dados.nome || !dados.email || !dados.senha) {
+        msg.className = 'admin-msg erro'; msg.textContent = 'Preencha todos os campos.'; return;
+    }
+    try {
+        const r = await fetch(API_BASE + '/admin/usuarios', {
+            method: 'POST', headers: Session.headers(), body: JSON.stringify(dados),
+        });
+        const d = await r.json();
+        if (r.ok) {
+            msg.className = 'admin-msg ok';
+            msg.textContent = '✅ Usuário criado: ' + d.usuario.email;
+            document.getElementById('novo_nome').value = '';
+            document.getElementById('novo_email').value = '';
+            document.getElementById('novo_senha').value = '';
+        } else {
+            msg.className = 'admin-msg erro';
+            msg.textContent = d.erro || 'Erro ao criar usuário.';
+        }
+    } catch(e) { msg.className = 'admin-msg erro'; msg.textContent = 'Erro de conexão.'; }
+}
+
+async function carregarLogs() {
+    try {
+        const r = await fetch(API_BASE + '/admin/logs', { headers: Session.headers() });
+        const d = await r.json();
+        const tb = document.getElementById('admin-lista-logs');
+        if (!d.logs || !d.logs.length) { tb.innerHTML = '<tr><td colspan="5" style="color:#90a4ae;padding:12px;">Sem logs.</td></tr>'; return; }
+        tb.innerHTML = d.logs.map(l => `
+            <tr>
+              <td style="white-space:nowrap;">${new Date(l.criado_em).toLocaleString('pt-BR')}</td>
+              <td>${l.acao}</td>
+              <td>${l.usuario || '–'}</td>
+              <td>${l.ip || '–'}</td>
+              <td>${l.detalhe || ''}</td>
+            </tr>`).join('');
+    } catch(e) {
+        document.getElementById('admin-lista-logs').innerHTML =
+            '<tr><td colspan="5" style="color:#c62828;">Erro ao carregar.</td></tr>';
+    }
+}
+
+async function carregarPareceres() {
+    try {
+        const r = await fetch(API_BASE + '/admin/pareceres', { headers: Session.headers() });
+        const d = await r.json();
+        const tb = document.getElementById('admin-lista-pareceres');
+        if (!d.pareceres || !d.pareceres.length) { tb.innerHTML = '<tr><td colspan="5" style="color:#90a4ae;padding:12px;">Sem pareceres.</td></tr>'; return; }
+        tb.innerHTML = d.pareceres.map(p => `
+            <tr>
+              <td style="white-space:nowrap;">${new Date(p.criado_em).toLocaleString('pt-BR')}</td>
+              <td>${p.analista || '–'}</td>
+              <td>${p.numero_processo || '–'}</td>
+              <td>${p.requerente || '–'}</td>
+              <td style="font-weight:700;color:${p.conclusao==='FAVORAVELMENTE'?'#2e7d32':'#c62828'};">${p.conclusao || '–'}</td>
+            </tr>`).join('');
+    } catch(e) {
+        document.getElementById('admin-lista-pareceres').innerHTML =
+            '<tr><td colspan="5" style="color:#c62828;">Erro ao carregar.</td></tr>';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INTEGRAÇÃO COM API (SIGAM / CAR) — com token JWT
+// ═══════════════════════════════════════════════════════════════
+async function consultarSIGAMBackend() {
+    const ano=v('sigam_ano'), orgao=v('sigam_orgao'), seq=v('sigam_seq');
+    const st=document.getElementById('status_busca_sigam');
+    if(!ano||!orgao||!seq){ alert('Preencha Ano, Órgão e Sequencial.'); return; }
+    if(!Session.token){ alert('Sessão expirada. Faça login novamente.'); location.reload(); return; }
+    st.innerText='⏳ Acessando SIGAM → buscando último requerimento e dados do RT... (~40s)';
+    try {
+        const r=await fetch(API_BASE+'/api/buscar-sigam', {
+            method:'POST',
+            headers: Session.headers(),
+            body: JSON.stringify({ano, orgao, sequencial:seq}),
+        });
+        if(r.status===401){ Session.limpar(); location.reload(); return; }
+        const d=await r.json();
+        if(d.sucesso){
+            const p=(id,val)=>{ const c=document.getElementById(id); if(c&&val) c.value=val; };
+            p('num_processo', d.numero_processo);
+            if(d.num_requerimento_doc) p('num_requerimento', d.num_requerimento_doc);
+            else if(d.numero_requerimento) p('num_requerimento', d.numero_requerimento);
+            p('resp_tecnico',     d.resp_tecnico_nome);
+            p('cpf_resp_tecnico', d.resp_tecnico_cpf);
+            p('email_resp',       d.resp_tecnico_email);
+            p('tel_resp',         d.resp_tecnico_tel);
+            p('titulo_prof',      d.resp_tecnico_formacao);
+            p('art_resp_tecnico', d.resp_tecnico_registro);
+            if(d.nome_requerente_doc) p('nome_requerente', d.nome_requerente_doc);
+            if(d.cpf_requerente_doc)  p('cpf_requerente',  d.cpf_requerente_doc);
+            const reqInfo = d.num_requerimento_doc ? ' | Req: '+d.num_requerimento_doc : '';
+            const preenchidos=[d.resp_tecnico_nome?'RT':'',d.resp_tecnico_cpf?'CPF':'',d.resp_tecnico_email?'E-mail':''].filter(Boolean).join(', ');
+            st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' '+preenchidos+'.':' ⚠️ RT não localizado.');
+        } else { st.innerText='❌ '+d.mensagem; }
+    } catch(e) { st.innerText='❌ Erro de conexão com a API.'; }
+}
+
+async function consultarCARBackend() {
+    const car=v('q5_num'), st=document.getElementById('status_busca');
+    if(!car){ alert('Digite o número do CAR'); return; }
+    if(!Session.token){ alert('Sessão expirada.'); location.reload(); return; }
+    st.innerText='⏳ Consultando SIGCAR... aguarde.';
+    try {
+        const r=await fetch(API_BASE+'/api/buscar-car', {
+            method:'POST',
+            headers: Session.headers(),
+            body: JSON.stringify({car}),
+        });
+        if(r.status===401){ Session.limpar(); location.reload(); return; }
+        const d=await r.json();
+        if(d.sucesso){
+            st.innerText='✅ Dados do CAR recuperados!';
+            const p=(id,val)=>{ const c=document.getElementById(id); if(c) c.value=val??''; };
+            p('status_car_input',d.status_car); p('q2',d.municipio||'');
+            p('nome_imovel',d.denominacao_imovel||''); p('data_sigcar',d.data_sigcar||'');
+            p('nome_requerente',d.nome_requerente); p('cpf_requerente',d.cpf_requerente);
+            p('area_escriturada',d.area_escriturada); p('area_vetorizada',d.area_vetorizada);
+            p('area_liquida',d.area_liquida); p('area_remanescente',d.remanescente);
+            p('area_pousio',d.pousio); p('area_consolidada',d.consolidada);
+            p('area_antropizada',d.antropizada); p('area_uso_alternativo',d.uso_alternativo);
+            p('area_infra_publica',d.infra_publica); p('area_utilidade_publica',d.utilidade_publica);
+            p('area_servidao',d.servidao); p('area_app',d.app); p('area_app_61a',d.app_61a);
+            p('area_app_recuperar',d.app_a_recuperar); p('area_rl',d.reserva_legal);
+            p('area_rl_pct',d.reserva_legal_pct||''); p('area_rl_suplementar',d.suplementar);
+            p('area_rl_total',d.reserva_legal_total); p('area_rl_recuperar',d.rl_a_recuperar);
+            p('area_arl_veg',d.arl_com_vegetacao);
+        } else { st.innerText='❌ '+d.mensagem; }
+    } catch(e) { st.innerText='❌ Erro de conexão com a API.'; }
+}
+
+// Registra o parecer no banco ao gerar (chamado dentro de gerarParecer)
+async function registrarParecer(dados) {
+    try {
+        await fetch(API_BASE + '/api/registrar-parecer', {
+            method: 'POST', headers: Session.headers(),
+            body: JSON.stringify(dados),
+        });
+    } catch(e) { /* silencioso — não bloqueia a impressão */ }
 }
 </script>
 
