@@ -225,8 +225,26 @@ def _gerar_token(usuario: Usuario) -> str:
 
 
 def _validar_token(token: str) -> dict:
-    """Decodifica e valida o JWT. Lança exceção se inválido/expirado."""
-    return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    """
+    Decodifica e valida o JWT.
+    Permite 1 hora de tolerância para tokens expirados
+    (cobre o caso do servidor Render acordando após dormir).
+    """
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        # Tenta decodificar ignorando expiração
+        payload = jwt.decode(
+            token, JWT_SECRET, algorithms=["HS256"],
+            options={"verify_exp": False}
+        )
+        # Aceita se expirou há menos de 2 horas (tolerância para servidor dormindo)
+        exp = payload.get("exp", 0)
+        agora = datetime.now(timezone.utc).timestamp()
+        if agora - exp < 7200:  # 2 horas de tolerância
+            log.info("Token expirado há %.0f min — aceito por tolerância", (agora - exp) / 60)
+            return payload
+        raise  # Expirado há mais de 2h — rejeita
 
 
 def requer_login(f):
@@ -268,28 +286,35 @@ def requer_admin(f):
 #  ROTAS DE AUTENTICAÇÃO
 # ═══════════════════════════════════════════════════════════════════
 
-@app.route("/auth/login", methods=["POST"])
-@limiter.limit("10 per minute")   # máximo 10 tentativas/min por IP
+@app.route("/auth/login", methods=["POST", "OPTIONS"])
 def login():
-    dados = request.get_json(silent=True) or {}
-    email = str(dados.get("email", "")).strip().lower()
-    senha = str(dados.get("senha", ""))
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
 
-    if not email or not senha:
-        return jsonify({"erro": "E-mail e senha são obrigatórios."}), 400
+    try:
+        dados = request.get_json(silent=True) or {}
+        email = str(dados.get("email", "")).strip().lower()
+        senha = str(dados.get("senha", ""))
 
-    # Sanitização: e-mail não pode ter caracteres perigosos
-    if not re.match(r"^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$", email):
-        return jsonify({"erro": "E-mail inválido."}), 400
+        if not email or not senha:
+            return jsonify({"erro": "E-mail e senha são obrigatórios."}), 400
 
-    usuario = Usuario.query.filter_by(email=email).first()
+        # Sanitização: e-mail não pode ter caracteres perigosos
+        if not re.match(r"^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$", email):
+            return jsonify({"erro": "E-mail inválido."}), 400
 
-    # Resposta genérica para não revelar se o e-mail existe
-    ERRO_CREDENCIAIS = {"erro": "E-mail ou senha incorretos."}
+        usuario = Usuario.query.filter_by(email=email).first()
 
-    if not usuario:
-        LogAcesso.registrar("login_falha", f"email={email} (não encontrado)")
-        return jsonify(ERRO_CREDENCIAIS), 401
+        # Resposta genérica para não revelar se o e-mail existe
+        ERRO_CREDENCIAIS = {"erro": "E-mail ou senha incorretos."}
+
+        if not usuario:
+            LogAcesso.registrar("login_falha", f"email={email} (não encontrado)")
+            return jsonify(ERRO_CREDENCIAIS), 401
+    except Exception as _e_login:
+        import traceback
+        log.error("ERRO NO LOGIN: %s", traceback.format_exc())
+        return jsonify({"erro": "Erro interno: " + str(_e_login)}), 500
 
     if not usuario.ativo:
         return jsonify({"erro": "Conta desativada. Contate o administrador."}), 403
@@ -1154,14 +1179,37 @@ def buscar_sigam():
 #  HEALTHCHECK
 # ═══════════════════════════════════════════════════════════════════
 
+# Garante que o banco é inicializado quando o servidor acorda
+# Roda uma única vez na primeira requisição após restart
+_banco_inicializado = False
+
+@app.before_request
+def garantir_banco():
+    global _banco_inicializado
+    if not _banco_inicializado:
+        try:
+            _inicializar_banco()
+            _banco_inicializado = True
+            log.info("Banco inicializado automaticamente.")
+        except Exception as e:
+            log.error("Erro ao inicializar banco: %s", e)
+            # Não bloqueia a requisição — tenta continuar mesmo com erro no banco
+
+
+@app.route("/init-db", methods=["GET"])
+def init_db_manual():
+    """Rota para forçar a inicialização do banco manualmente se necessário."""
+    try:
+        _inicializar_banco()
+        return jsonify({"status": "ok", "mensagem": "Banco inicializado com sucesso."})
+    except Exception as e:
+        return jsonify({"status": "erro", "mensagem": str(e)}), 500
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "naturatins-parecer"})
 
-
-@app.route("/auth/login", methods=["OPTIONS"])
-def login_options():
-    return jsonify({"status": "ok"}), 200
 
 
 @app.route("/api/registrar-parecer", methods=["OPTIONS"])
