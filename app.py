@@ -979,21 +979,30 @@ def buscar_car():
 # ═══════════════════════════════════════════════════════════════════
 
 @app.route("/api/buscar-sigam", methods=["POST", "OPTIONS"])
-@limiter.limit("20 per hour")
 def buscar_sigam():
     if request.method == "OPTIONS":
         return jsonify({"status": "ok"}), 200
 
     auth = request.headers.get("Authorization", "")
+    log.info("SIGAM auth header (primeiros 30 chars): %s", auth[:30] if auth else "VAZIO")
     if not auth.startswith("Bearer "):
+        log.warning("SIGAM: token não enviado ou formato inválido")
         return jsonify({"erro": "Token não fornecido."}), 401
+    token_str = auth[7:]
+    log.info("SIGAM token (primeiros 30 chars): %s", token_str[:30])
     try:
-        payload  = _validar_token(auth[7:])
+        payload  = _validar_token(token_str)
+        log.info("SIGAM token válido para usuário id=%s", payload.get("sub"))
         usuario  = db.session.get(Usuario, payload["sub"])
         if not usuario or not usuario.ativo:
+            log.warning("SIGAM: usuário não encontrado ou inativo")
             return jsonify({"erro": "Usuário inativo."}), 403
-    except jwt.InvalidTokenError:
-        return jsonify({"erro": "Token inválido."}), 401
+    except jwt.InvalidTokenError as e:
+        log.error("SIGAM token rejeitado: %s", e)
+        return jsonify({"erro": "Token inválido: " + str(e)}), 401
+    except Exception as e:
+        log.error("SIGAM erro inesperado na auth: %s", e)
+        return jsonify({"erro": "Erro de autenticação: " + str(e)}), 401
 
     driver = None
     try:
