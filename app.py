@@ -214,7 +214,7 @@ class LogAcesso(db.Model):
 
 def _gerar_token(usuario: Usuario) -> str:
     payload = {
-        "sub":    usuario.id,
+        "sub":    str(usuario.id),  # PyJWT 2.x exige string
         "email":  usuario.email,
         "perfil": usuario.perfil,
         "exp":    datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRES_H),
@@ -262,7 +262,7 @@ def requer_login(f):
         except jwt.InvalidTokenError:
             return jsonify({"erro": "Token inválido."}), 401
 
-        usuario = db.session.get(Usuario, payload["sub"])
+        usuario = db.session.get(Usuario, int(payload["sub"]))
         if not usuario or not usuario.ativo:
             return jsonify({"erro": "Usuário inativo ou não encontrado."}), 403
 
@@ -532,7 +532,7 @@ def registrar_parecer():
         return jsonify({"erro": "Token não fornecido."}), 401
     try:
         payload = _validar_token(auth[7:])
-        usuario = db.session.get(Usuario, payload["sub"])
+        usuario = db.session.get(Usuario, int(payload["sub"]))
         if not usuario or not usuario.ativo:
             return jsonify({"erro": "Usuário inativo."}), 403
         g.usuario = usuario
@@ -837,7 +837,7 @@ def buscar_car():
         return jsonify({"erro": "Token não fornecido."}), 401
     try:
         payload = _validar_token(auth[7:])
-        usuario = db.session.get(Usuario, payload["sub"])
+        usuario = db.session.get(Usuario, int(payload["sub"]))
         if not usuario or not usuario.ativo:
             return jsonify({"erro": "Usuário inativo."}), 403
     except jwt.InvalidTokenError:
@@ -992,8 +992,8 @@ def buscar_sigam():
     log.info("SIGAM token (primeiros 30 chars): %s", token_str[:30])
     try:
         payload  = _validar_token(token_str)
-        log.info("SIGAM token válido para usuário id=%s", payload.get("sub"))
-        usuario  = db.session.get(Usuario, payload["sub"])
+        log.info("SIGAM token válido para usuário id=%s", int(payload.get("sub", 0)) if payload.get("sub") else None)
+        usuario  = db.session.get(Usuario, int(payload["sub"]))
         if not usuario or not usuario.ativo:
             log.warning("SIGAM: usuário não encontrado ou inativo")
             return jsonify({"erro": "Usuário inativo."}), 403
