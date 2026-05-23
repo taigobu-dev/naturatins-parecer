@@ -565,9 +565,11 @@ def registrar_parecer():
 def _criar_driver() -> webdriver.Chrome:
     """
     Cria Chrome headless.
-    No Render usa o Chromium instalado via Playwright.
+    No Render usa o Chromium instalado via Playwright (em /opt/render/.cache/ms-playwright/).
     Localmente usa o ChromeDriverManager.
     """
+    import glob
+
     opts = webdriver.ChromeOptions()
     opts.add_argument("--headless=new")
     opts.add_argument("--window-size=1920,1080")
@@ -577,36 +579,39 @@ def _criar_driver() -> webdriver.Chrome:
     opts.add_argument("--disable-extensions")
     opts.add_argument("--disable-infobars")
     opts.add_argument("--log-level=3")
-    opts.add_argument("--single-process")
 
-    # No Render o Playwright instala o Chromium em caminho fixo
-    playwright_chrome = os.path.expanduser(
-        "~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"
-    )
-    import glob
-    caminhos = glob.glob(playwright_chrome)
-    if caminhos:
-        chrome_path = caminhos[0]
-        log.info("Chrome via Playwright: %s", chrome_path)
-        opts.binary_location = chrome_path
-        # chromedriver do playwright
-        driver_path = chrome_path.replace(
-            "chrome-linux/chrome",
-            "chrome-linux/chromedriver"
-        )
-        if not os.path.exists(driver_path):
-            driver_path = chrome_path.replace(
-                "/chrome-linux/chrome",
-                "/chromedriver-linux64/chromedriver"
-            )
-        if os.path.exists(driver_path):
-            return webdriver.Chrome(
-                service=Service(driver_path),
+    # Procura Chrome do Playwright em vários caminhos possíveis
+    caminhos_chrome_possiveis = [
+        "/opt/render/.cache/ms-playwright/chromium-*/chrome-linux/chrome",
+        "/opt/render/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell",
+        "/opt/render/.cache/ms-playwright/chromium-*/chrome-linux64/chrome",
+        os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"),
+        os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell"),
+    ]
+
+    chrome_encontrado = None
+    for padrao in caminhos_chrome_possiveis:
+        achados = glob.glob(padrao)
+        if achados:
+            chrome_encontrado = achados[0]
+            log.info("Chrome encontrado: %s", chrome_encontrado)
+            break
+
+    if chrome_encontrado:
+        opts.binary_location = chrome_encontrado
+        # Tenta usar ChromeDriverManager mesmo com binary customizado
+        try:
+            driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()),
                 options=opts,
             )
+            return driver
+        except Exception as exc:
+            log.warning("ChromeDriverManager falhou: %s — tentando driver padrão", exc)
+            return webdriver.Chrome(options=opts)
 
-    # Fallback local: ChromeDriverManager
-    log.info("Chrome via ChromeDriverManager (local)")
+    # Fallback completo: ChromeDriverManager sem binary location
+    log.warning("Chrome do Playwright não encontrado — usando ChromeDriverManager")
     return webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
         options=opts,
