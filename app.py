@@ -580,14 +580,29 @@ def _criar_driver() -> webdriver.Chrome:
     opts.add_argument("--disable-infobars")
     opts.add_argument("--log-level=3")
 
-    # Procura Chrome do Playwright em vários caminhos possíveis
-    caminhos_chrome_possiveis = [
-        "/opt/render/.cache/ms-playwright/chromium-*/chrome-linux/chrome",
-        "/opt/render/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell",
-        "/opt/render/.cache/ms-playwright/chromium-*/chrome-linux64/chrome",
-        os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"),
-        os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell"),
+    # Procura Chrome em todos os caminhos possíveis do Render/Playwright
+    caminhos_chrome_possiveis = []
+    bases_busca = [
+        "/opt/render/.cache/ms-playwright",
+        os.path.expanduser("~/.cache/ms-playwright"),
+        "/root/.cache/ms-playwright",
+        os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ""),
     ]
+    for base in bases_busca:
+        if not base or not os.path.exists(base):
+            continue
+        # Adiciona todos os padrões possíveis
+        caminhos_chrome_possiveis.extend([
+            os.path.join(base, "chromium-*/chrome-linux/chrome"),
+            os.path.join(base, "chromium-*/chrome-linux64/chrome"),
+            os.path.join(base, "chromium_headless_shell-*/chrome-linux/headless_shell"),
+            os.path.join(base, "chromium_headless_shell-*/chrome-linux/chrome"),
+        ])
+        # Log do que está realmente lá
+        try:
+            log.info("Conteúdo de %s: %s", base, os.listdir(base))
+        except Exception:
+            pass
 
     chrome_encontrado = None
     for padrao in caminhos_chrome_possiveis:
