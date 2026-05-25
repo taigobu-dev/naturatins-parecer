@@ -865,61 +865,87 @@ def _sigcar_buscar_imovel(s: req.Session, numero_car: str) -> dict:
 
 
 def _sigcar_ficha(s: req.Session, url_ficha: str) -> dict:
-    """Acessa a ficha do imóvel e extrai todos os dados detalhados."""
+    """Acessa a ficha do imóvel e extrai dados via JSON embutido no JS."""
+    import json as _json
     r = s.get(url_ficha, timeout=30)
     soup = BeautifulSoup(r.text, "html.parser")
-    texto = soup.get_text(separator="\n", strip=True)
 
-    def _achar(padrao):
-        m = re.search(padrao, texto, re.IGNORECASE)
-        return m.group(1).strip() if m else ""
-
-    def _td_val(id_el):
-        el = soup.find(id=id_el)
-        if not el:
-            return ""
-        tds = el.find_all("td")
-        return tds[1].get_text(strip=True) if len(tds) > 1 else el.get_text(strip=True)
-
-    # Proprietário
+    # Proprietário — tabela de domínio (pessoa física)
     nome_req = ""
     cpf_req  = ""
     tabela_pf = soup.find(id="tabela_ficha_pf")
     if tabela_pf:
-        trs = tabela_pf.find_all("tr")
-        if trs:
-            tds = trs[0].find_all("td") if trs else []
-            nome_req = tds[0].get_text(strip=True) if tds else ""
-            cpf_req  = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+        tbody = tabela_pf.find("tbody")
+        trs = tbody.find_all("tr") if tbody else tabela_pf.find_all("tr")
+        for tr in trs:
+            tds = tr.find_all("td")
+            if tds and tds[0].get_text(strip=True):
+                nome_req = tds[0].get_text(strip=True)
+                cpf_req  = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+                break
 
-    if not nome_req:
-        nome_req = _achar(r"Nome[^:]*:\s*\n?\s*([^\n]+)")
-    if not cpf_req:
-        cpf_req = _achar(r"CPF[^:]*:\s*\n?\s*([\d.\-/]+)")
+    # Dados de área — JSON embutido: atualizarCalculoAreas(JSON.parse('...'))
+    areas = {}
+    for script in soup.find_all("script"):
+        txt = script.string or ""
+        m = re.search(r"atualizarCalculoAreas\(JSON\.parse\('(\{.*?\})'\)\)", txt, re.DOTALL)
+        if m:
+            try:
+                areas = _json.loads(m.group(1))
+                log.info("SIGCAR: JSON de áreas extraído com %d campos", len(areas))
+            except Exception as e:
+                log.warning("SIGCAR: falha ao parsear JSON de áreas: %s", e)
+            break
+
+    def _av(key):
+        v = areas.get(key)
+        return _num(str(v)) if v is not None else 0.0
+
+    def _ap(key):
+        v = areas.get(key + "Porcentagem") or areas.get(key + "PorcentagemLiquida") or ""
+        return str(v) if v else ""
+
+    # Área total e módulos fiscais
+    area_total_txt = ""
+    mod_fiscais_txt = ""
+    el_area = soup.find(id="detalheAreaImovel")
+    if el_area:
+        area_total_txt = el_area.get_text(strip=True)
+    el_mod = soup.find(id="detalheNumeroModulosFiscais")
+    if el_mod:
+        mod_fiscais_txt = el_mod.get_text(strip=True)
+
+    # Data de cadastro
+    data_cadastro = ""
+    td_data = soup.select_one("table.historico_propriedades_entidades tbody tr td._data")
+    if td_data:
+        data_cadastro = td_data.get_text(strip=True)[:10]
 
     return {
         "nome_requerente":         nome_req,
         "cpf_requerente":          cpf_req,
-        "area_vetorizada":         _num(_td_val("areaImovel")),
-        "area_liquida":            _num(_td_val("areaImovelLiquida")),
-        "remanescente":            _num(_td_val("vegetacaoNativa")),
-        "consolidada":             _num(_td_val("areaConsolidada")),
-        "antropizada":             _num(_td_val("areaAntropizadaApos22072008")),
-        "uso_alternativo":         _num(_td_val("areaUsoAlternativo")),
-        "pousio":                  _num(_td_val("areaPousio")),
-        "infra_publica":           _num(_td_val("areaInfraPublica")),
-        "utilidade_publica":       _num(_td_val("areaUtilidadePublica")),
-        "servidao":                _num(_td_val("areaServidaoAdm")),
-        "app":                     _num(_td_val("appGeral")),
-        "app_61a":                 _num(_td_val("appEscadinha")),
-        "app_a_recuperar":         _num(_td_val("appDegradada")),
-        "reserva_legal":           _num(_td_val("arlProposta")),
-        "reserva_legal_pct":       _pct(soup.find(id="arlProposta").get_text() if soup.find(id="arlProposta") else ""),
-        "suplementar":             _num(_td_val("arlSuplementar")),
-        "rl_a_recuperar":          _num(_td_val("arlDegradada")),
-        "reserva_legal_total":     _num(_td_val("arlTotal")),
-        "reserva_legal_total_pct": _pct(soup.find(id="arlTotal").get_text() if soup.find(id="arlTotal") else ""),
-        "arl_com_vegetacao":       _num(_td_val("arlComVegetacao")),
+        "area_vetorizada":         _av("areaImovel"),
+        "area_liquida":            _av("areaImovelLiquida"),
+        "remanescente":            _av("vegetacaoNativa"),
+        "consolidada":             _av("areaConsolidada"),
+        "antropizada":             _av("areaAntropizadaApos22072008"),
+        "uso_alternativo":         _av("areaUsoAlternativo"),
+        "pousio":                  _av("areaPousio"),
+        "infra_publica":           _av("areaInfraestruturaPublica"),
+        "utilidade_publica":       _av("areaUtilidadePublica"),
+        "servidao":                _av("areaServidaoAdministrativaTotal"),
+        "app":                     _av("appGeral"),
+        "app_61a":                 _av("appEscadinha"),
+        "app_a_recuperar":         _av("appDegradada"),
+        "reserva_legal":           _av("arlProposta"),
+        "reserva_legal_pct":       _ap("arlProposta"),
+        "suplementar":             _av("arlSuplementar"),
+        "rl_a_recuperar":          _av("arlDegradada"),
+        "reserva_legal_total":     _av("arlTotal"),
+        "reserva_legal_total_pct": _ap("arlTotal"),
+        "arl_com_vegetacao":       _av("arlComVegetacao"),
+        "area_escriturada":        _num(area_total_txt),
+        "data_sigcar":             data_cadastro,
     }
 
 
