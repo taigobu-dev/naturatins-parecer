@@ -1156,6 +1156,24 @@ def _inicializar_banco():
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  ROTA DE EMERGÊNCIA — REMOVER APÓS USO
+# ═══════════════════════════════════════════════════════════════════
+
+@app.route("/admin/emergencia/desbloquear/<email>/<chave>", methods=["GET"])
+def desbloquear_emergencia(email, chave):
+    if chave != "naturatins2026unlock":
+        return jsonify({"erro": "Chave inválida."}), 403
+    u = Usuario.query.filter_by(email=email).first()
+    if not u:
+        return jsonify({"erro": "Usuário não encontrado."}), 404
+    u.tentativas_login = 0
+    u.bloqueado_ate = None
+    db.session.commit()
+    log.info("Emergência: conta %s desbloqueada.", email)
+    return jsonify({"mensagem": f"Conta {email} desbloqueada com sucesso."})
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════
 
