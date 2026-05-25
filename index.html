@@ -161,6 +161,18 @@
         }
         .btn-senha-menu:hover { background:rgba(255,255,255,.25); }
 
+        /* ══ TOGGLE MOSTRAR/OCULTAR SENHA ════════════════════════════ */
+        .pwd-wrap { position: relative; }
+        .pwd-wrap input { padding-right: 38px !important; }
+        .btn-olho {
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; padding: 4px;
+            color: #90a4ae; font-size: 16px; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+            transition: color .15s;
+        }
+        .btn-olho:hover { color: #37474f; }
+
         /* ══ PAINEL ADMIN ═══════════════════════════════════════════ */
         #painel-admin {
             position: fixed; inset: 0; z-index: 8000;
@@ -310,8 +322,11 @@
     </div>
     <div class="login-field">
       <label>Senha</label>
-      <input type="password" id="login_senha" placeholder="••••••••••"
-             onkeydown="if(event.key==='Enter') fazerLogin()">
+      <div class="pwd-wrap">
+        <input type="password" id="login_senha" placeholder="••••••••••"
+               onkeydown="if(event.key==='Enter') fazerLogin()">
+        <button type="button" class="btn-olho" onclick="toggleSenha('login_senha', this)" title="Mostrar/ocultar senha">👁</button>
+      </div>
     </div>
     <button class="btn-login" onclick="fazerLogin()">Entrar</button>
     <div class="login-erro" id="login_erro"></div>
@@ -343,16 +358,25 @@
     <h3>🔑 Trocar Senha</h3>
     <div class="senha-field">
       <label>Senha atual</label>
-      <input type="password" id="senha_atual" placeholder="••••••••••">
+      <div class="pwd-wrap">
+        <input type="password" id="senha_atual" placeholder="••••••••••">
+        <button type="button" class="btn-olho" onclick="toggleSenha('senha_atual', this)" title="Mostrar/ocultar">👁</button>
+      </div>
     </div>
     <div class="senha-field">
       <label>Nova senha</label>
-      <input type="password" id="senha_nova" placeholder="Mínimo 10 caracteres">
+      <div class="pwd-wrap">
+        <input type="password" id="senha_nova" placeholder="Mínimo 10 caracteres">
+        <button type="button" class="btn-olho" onclick="toggleSenha('senha_nova', this)" title="Mostrar/ocultar">👁</button>
+      </div>
     </div>
     <div class="senha-field">
       <label>Confirmar nova senha</label>
-      <input type="password" id="senha_confirma" placeholder="Repita a nova senha"
-             onkeydown="if(event.key==='Enter') confirmarTrocarSenha()">
+      <div class="pwd-wrap">
+        <input type="password" id="senha_confirma" placeholder="Repita a nova senha"
+               onkeydown="if(event.key==='Enter') confirmarTrocarSenha()">
+        <button type="button" class="btn-olho" onclick="toggleSenha('senha_confirma', this)" title="Mostrar/ocultar">👁</button>
+      </div>
     </div>
     <button class="btn-trocar-senha" onclick="confirmarTrocarSenha()">Salvar nova senha</button>
     <div class="senha-msg" id="senha-msg"></div>
@@ -392,7 +416,10 @@
         <input type="email" id="novo_email" placeholder="email@naturatins.to.gov.br">
       </div>
       <div class="admin-form-row">
-        <input type="password" id="novo_senha" placeholder="Senha (mín. 10 chars, maiúsc., número, especial)">
+        <div class="pwd-wrap">
+          <input type="password" id="novo_senha" placeholder="Senha (mín. 10 chars, maiúsc., número, especial)">
+          <button type="button" class="btn-olho" onclick="toggleSenha('novo_senha', this)" title="Mostrar/ocultar">👁</button>
+        </div>
         <select id="novo_perfil">
           <option value="analista">Analista</option>
           <option value="admin">Administrador</option>
@@ -1538,19 +1565,53 @@ async function carregarUsuarios() {
               <td>${u.nome}</td>
               <td>${u.email}</td>
               <td>${u.perfil === 'admin' ? '<span class="tag-admin">Admin</span>' : 'Analista'}</td>
-              <td>${u.ativo ? '<span class="tag-ativo">Ativo</span>' : '<span class="tag-inativo">Inativo</span>'}</td>
-              <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '–'}</td>
               <td>
+                ${u.ativo ? '<span class="tag-ativo">Ativo</span>' : '<span class="tag-inativo">Inativo</span>'}
+                ${u.bloqueado ? ' <span style="background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700;">🔒 Bloqueado</span>' : ''}
+              </td>
+              <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '–'}</td>
+              <td style="white-space:nowrap;display:flex;gap:4px;flex-wrap:wrap;">
                 <button onclick="toggleUsuario(${u.id}, ${u.ativo})"
                   style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #b0bec5;cursor:pointer;background:white;">
                   ${u.ativo ? 'Desativar' : 'Ativar'}
                 </button>
+                ${u.bloqueado ? `<button onclick="desbloquearUsuario(${u.id})"
+                  style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #e65100;cursor:pointer;background:#fff3e0;color:#e65100;font-weight:700;">
+                  🔓 Desbloquear
+                </button>` : ''}
               </td>
             </tr>`).join('');
     } catch(e) {
         document.getElementById('admin-lista-usuarios').innerHTML =
             '<tr><td colspan="6" style="color:#c62828;">Erro ao carregar.</td></tr>';
     }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TOGGLE MOSTRAR/OCULTAR SENHA
+// ═══════════════════════════════════════════════════════════════
+function toggleSenha(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const visivel = input.type === 'text';
+    input.type = visivel ? 'password' : 'text';
+    btn.textContent = visivel ? '👁' : '🙈';
+    btn.title = visivel ? 'Mostrar senha' : 'Ocultar senha';
+}
+
+async function desbloquearUsuario(id) {
+    if (!confirm('Desbloquear esta conta agora?')) return;
+    try {
+        const r = await fetch(API_BASE + '/admin/usuarios/' + id + '/desbloquear', {
+            method: 'POST', headers: Session.headers(),
+        });
+        if (r.ok) {
+            carregarUsuarios();
+        } else {
+            const d = await r.json();
+            alert(d.erro || 'Erro ao desbloquear.');
+        }
+    } catch(e) { alert('Erro de conexão.'); }
 }
 
 async function toggleUsuario(id, ativo) {

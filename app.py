@@ -133,6 +133,7 @@ class Usuario(db.Model):
             "email":      self.email,
             "perfil":     self.perfil,
             "ativo":      self.ativo,
+            "bloqueado":  self.esta_bloqueado(),
             "criado_em":  self.criado_em.isoformat() if self.criado_em else None,
             "ultimo_acesso": self.ultimo_acesso.isoformat() if self.ultimo_acesso else None,
         }
@@ -447,6 +448,21 @@ def resetar_senha(uid: int):
     db.session.commit()
     LogAcesso.registrar("senha_resetada", f"uid={uid}", g.usuario.id)
     return jsonify({"mensagem": "Senha redefinida com sucesso."})
+
+
+@app.route("/admin/usuarios/<int:uid>/desbloquear", methods=["POST"])
+@requer_login
+@requer_admin
+def desbloquear_usuario(uid: int):
+    usuario = db.session.get(Usuario, uid)
+    if not usuario:
+        return jsonify({"erro": "Usuário não encontrado."}), 404
+
+    usuario.resetar_tentativas()
+    db.session.commit()
+    LogAcesso.registrar("usuario_desbloqueado", f"uid={uid}", g.usuario.id)
+    log.info("Usuário %s desbloqueado por admin %s", usuario.email, g.usuario.email)
+    return jsonify({"mensagem": "Conta desbloqueada com sucesso.", "usuario": usuario.to_dict()})
 
 
 @app.route("/admin/logs", methods=["GET"])
