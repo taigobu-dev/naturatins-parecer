@@ -1,7 +1,7 @@
 """
 NATURATINS – Gerador de Parecer Técnico
 API Flask com autenticação JWT, banco PostgreSQL e segurança profissional.
-Deploy: Render.com
+Deploy: Render.com — SEM Selenium, usa requests puro.
 """
 
 import os, re, time, logging, secrets
@@ -15,14 +15,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import bcrypt
 import jwt
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import requests as req
+from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════════════════════════
 #  CONFIGURAÇÃO
@@ -37,21 +31,12 @@ log = logging.getLogger("naturatins")
 
 app = Flask(__name__)
 
-# ── Segurança ────────────────────────────────────────────────────
-# JWT_SECRET deve ser uma string longa e aleatória definida no Render.
-# Gere com: python -c "import secrets; print(secrets.token_hex(64))"
 JWT_SECRET      = os.environ.get("JWT_SECRET", secrets.token_hex(64))
-JWT_EXPIRES_H   = int(os.environ.get("JWT_EXPIRES_HORAS", "8"))   # token expira em N horas
+JWT_EXPIRES_H   = int(os.environ.get("JWT_EXPIRES_HORAS", "8"))
 ADMIN_EMAIL     = os.environ.get("ADMIN_EMAIL", "admin@naturatins.to.gov.br")
-ADMIN_SENHA_INI = os.environ.get("ADMIN_SENHA_INICIAL", "")        # só usado no primeiro boot
+ADMIN_SENHA_INI = os.environ.get("ADMIN_SENHA_INICIAL", "")
 
-# ── Banco de dados ───────────────────────────────────────────────
-# No Render: Settings → Environment → DATABASE_URL (gerado automaticamente)
-DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "sqlite:///naturatins_dev.db"    # SQLite para desenvolvimento local
-)
-# Render usa "postgres://" mas SQLAlchemy precisa de "postgresql://"
+DB_URL = os.environ.get("DATABASE_URL", "sqlite:///naturatins_dev.db")
 if DB_URL.startswith("postgres://"):
     DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
 
@@ -64,9 +49,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"]      = {
 
 db = SQLAlchemy(app)
 
-# ── CORS restrito ─────────────────────────────────────────────────
-# Defina ORIGENS_PERMITIDAS no Render com a URL do seu GitHub Pages
-# Ex: "https://meuusuario.github.io,http://127.0.0.1:5500"
 _origens_raw = os.environ.get(
     "ORIGENS_PERMITIDAS",
     "http://127.0.0.1:3000,http://127.0.0.1:5500,http://localhost:5500"
@@ -80,7 +62,6 @@ CORS(app,
      methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
      expose_headers=["Content-Type", "Authorization"])
 
-# ── Rate limiting (proteção contra força bruta / DDoS) ───────────
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
@@ -88,12 +69,14 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
-# ── Credenciais dos sistemas externos ───────────────────────────
 SIGCAR_USUARIO = os.environ.get("SIGCAR_USUARIO", "")
 SIGCAR_SENHA   = os.environ.get("SIGCAR_SENHA",   "")
 SIGAM_USUARIO  = os.environ.get("SIGAM_USUARIO",  "")
 SIGAM_SENHA    = os.environ.get("SIGAM_SENHA",    "")
 SIGAM_BASE     = "https://sigam.to.gov.br/proton"
+SIGCAR_BASE    = "http://sigcar.semarh.to.gov.br"
+
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -101,18 +84,17 @@ SIGAM_BASE     = "https://sigam.to.gov.br/proton"
 # ═══════════════════════════════════════════════════════════════════
 
 class Usuario(db.Model):
-    """Analistas e administradores com acesso ao sistema."""
     __tablename__ = "usuarios"
 
     id            = db.Column(db.Integer, primary_key=True)
     nome          = db.Column(db.String(120), nullable=False)
     email         = db.Column(db.String(180), unique=True, nullable=False, index=True)
     senha_hash    = db.Column(db.String(256), nullable=False)
-    perfil        = db.Column(db.String(20), nullable=False, default="analista")  # analista | admin
+    perfil        = db.Column(db.String(20), nullable=False, default="analista")
     ativo         = db.Column(db.Boolean, nullable=False, default=True)
     criado_em     = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     ultimo_acesso = db.Column(db.DateTime, nullable=True)
-    tentativas_login = db.Column(db.Integer, default=0)   # bloqueia após 5 falhas
+    tentativas_login = db.Column(db.Integer, default=0)
     bloqueado_ate    = db.Column(db.DateTime, nullable=True)
 
     pareceres = db.relationship("Parecer", backref="autor", lazy=True)
@@ -154,7 +136,6 @@ class Usuario(db.Model):
 
 
 class Parecer(db.Model):
-    """Registro de cada parecer gerado — auditoria completa."""
     __tablename__ = "pareceres"
 
     id             = db.Column(db.Integer, primary_key=True)
@@ -164,7 +145,7 @@ class Parecer(db.Model):
     num_parecer    = db.Column(db.String(50))
     requerente     = db.Column(db.String(200))
     municipio      = db.Column(db.String(100))
-    conclusao      = db.Column(db.String(30))   # FAVORAVELMENTE | DESFAVORAVELMENTE
+    conclusao      = db.Column(db.String(30))
     criado_em      = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     ip_origem      = db.Column(db.String(50))
 
@@ -183,12 +164,11 @@ class Parecer(db.Model):
 
 
 class LogAcesso(db.Model):
-    """Log de todas as ações relevantes para auditoria."""
     __tablename__ = "logs_acesso"
 
     id          = db.Column(db.Integer, primary_key=True)
     usuario_id  = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
-    acao        = db.Column(db.String(50))   # login | logout | busca_sigam | busca_car | etc.
+    acao        = db.Column(db.String(50))
     detalhe     = db.Column(db.String(500))
     ip          = db.Column(db.String(50))
     criado_em   = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -209,46 +189,38 @@ class LogAcesso(db.Model):
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  JWT — GERAÇÃO E VALIDAÇÃO
+#  JWT
 # ═══════════════════════════════════════════════════════════════════
 
 def _gerar_token(usuario: Usuario) -> str:
     payload = {
-        "sub":    str(usuario.id),  # PyJWT 2.x exige string
+        "sub":    str(usuario.id),
         "email":  usuario.email,
         "perfil": usuario.perfil,
         "exp":    datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRES_H),
         "iat":    datetime.now(timezone.utc),
-        "jti":    secrets.token_hex(16),   # ID único do token (permite revogação futura)
+        "jti":    secrets.token_hex(16),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
 def _validar_token(token: str) -> dict:
-    """
-    Decodifica e valida o JWT.
-    Permite 1 hora de tolerância para tokens expirados
-    (cobre o caso do servidor Render acordando após dormir).
-    """
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
-        # Tenta decodificar ignorando expiração
         payload = jwt.decode(
             token, JWT_SECRET, algorithms=["HS256"],
             options={"verify_exp": False}
         )
-        # Aceita se expirou há menos de 2 horas (tolerância para servidor dormindo)
         exp = payload.get("exp", 0)
         agora = datetime.now(timezone.utc).timestamp()
-        if agora - exp < 7200:  # 2 horas de tolerância
+        if agora - exp < 7200:
             log.info("Token expirado há %.0f min — aceito por tolerância", (agora - exp) / 60)
             return payload
-        raise  # Expirado há mais de 2h — rejeita
+        raise
 
 
 def requer_login(f):
-    """Decorator que exige token JWT válido em qualquer rota."""
     @wraps(f)
     def wrapper(*args, **kwargs):
         auth = request.headers.get("Authorization", "")
@@ -266,13 +238,12 @@ def requer_login(f):
         if not usuario or not usuario.ativo:
             return jsonify({"erro": "Usuário inativo ou não encontrado."}), 403
 
-        g.usuario = usuario   # disponível em toda a requisição
+        g.usuario = usuario
         return f(*args, **kwargs)
     return wrapper
 
 
 def requer_admin(f):
-    """Decorator que exige perfil admin (use APÓS @requer_login)."""
     @wraps(f)
     def wrapper(*args, **kwargs):
         if g.usuario.perfil != "admin":
@@ -299,13 +270,10 @@ def login():
         if not email or not senha:
             return jsonify({"erro": "E-mail e senha são obrigatórios."}), 400
 
-        # Sanitização: e-mail não pode ter caracteres perigosos
         if not re.match(r"^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$", email):
             return jsonify({"erro": "E-mail inválido."}), 400
 
         usuario = Usuario.query.filter_by(email=email).first()
-
-        # Resposta genérica para não revelar se o e-mail existe
         ERRO_CREDENCIAIS = {"erro": "E-mail ou senha incorretos."}
 
         if not usuario:
@@ -328,7 +296,6 @@ def login():
         LogAcesso.registrar("login_falha", f"email={email}", usuario.id)
         return jsonify(ERRO_CREDENCIAIS), 401
 
-    # Login bem-sucedido
     usuario.resetar_tentativas()
     usuario.ultimo_acesso = datetime.now(timezone.utc)
     db.session.commit()
@@ -379,7 +346,6 @@ def alterar_senha():
 
 
 def _validar_forca_senha(senha: str) -> str:
-    """Valida força da senha. Retorna string de erro ou vazio se OK."""
     if len(senha) < 10:
         return "A senha deve ter pelo menos 10 caracteres."
     if not re.search(r"[A-Z]", senha):
@@ -432,7 +398,6 @@ def criar_usuario():
     db.session.add(novo)
     db.session.commit()
     LogAcesso.registrar("usuario_criado", f"email={email}", g.usuario.id)
-    log.info("Novo usuário criado: %s por %s", email, g.usuario.email)
     return jsonify({"mensagem": "Usuário criado.", "usuario": novo.to_dict()}), 201
 
 
@@ -452,7 +417,6 @@ def atualizar_usuario(uid: int):
     if "nome" in dados and dados["nome"].strip():
         usuario.nome = dados["nome"].strip()
 
-    # Não permite o admin desativar a própria conta
     if usuario.id == g.usuario.id and not usuario.ativo:
         return jsonify({"erro": "Não é possível desativar sua própria conta."}), 400
 
@@ -488,7 +452,7 @@ def resetar_senha(uid: int):
 def listar_logs():
     pagina = request.args.get("pagina", 1, type=int)
     por_pagina = 50
-    logs = (LogAcesso.query
+    logs_q = (LogAcesso.query
             .order_by(LogAcesso.criado_em.desc())
             .paginate(page=pagina, per_page=por_pagina, error_out=False))
     return jsonify({
@@ -499,9 +463,9 @@ def listar_logs():
             "ip":       l.ip,
             "usuario":  l.usuario.email if l.usuario else "–",
             "criado_em": l.criado_em.isoformat() if l.criado_em else None,
-        } for l in logs.items],
-        "total":   logs.total,
-        "paginas": logs.pages,
+        } for l in logs_q.items],
+        "total":   logs_q.total,
+        "paginas": logs_q.pages,
         "pagina":  pagina,
     })
 
@@ -526,7 +490,6 @@ def listar_pareceres():
 def registrar_parecer():
     if request.method == "OPTIONS":
         return jsonify({"status": "ok"}), 200
-    # Valida autenticação manualmente
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return jsonify({"erro": "Token não fornecido."}), 401
@@ -538,7 +501,7 @@ def registrar_parecer():
         g.usuario = usuario
     except jwt.InvalidTokenError:
         return jsonify({"erro": "Token inválido."}), 401
-    """Salva o registro do parecer gerado no banco para auditoria."""
+
     dados = request.get_json(silent=True) or {}
     parecer = Parecer(
         usuario_id     = g.usuario.id,
@@ -559,142 +522,140 @@ def registrar_parecer():
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  SELENIUM — UTILITÁRIOS
+#  SIGAM — HELPERS via requests
 # ═══════════════════════════════════════════════════════════════════
 
-def _criar_driver() -> webdriver.Chrome:
-    """
-    Cria Chrome headless.
-    No Render usa o Chromium instalado via Playwright (em /opt/render/.cache/ms-playwright/).
-    Localmente usa o ChromeDriverManager.
-    """
-    import glob
+def _sigam_session() -> req.Session:
+    """Cria sessão autenticada no SIGAM via requests."""
+    s = req.Session()
+    s.headers.update({"User-Agent": UA})
 
-    opts = webdriver.ChromeOptions()
-    opts.add_argument("--headless=new")
-    opts.add_argument("--window-size=1920,1080")
-    opts.add_argument("--disable-gpu")
-    opts.add_argument("--no-sandbox")
-    opts.add_argument("--disable-dev-shm-usage")
-    opts.add_argument("--disable-extensions")
-    opts.add_argument("--disable-infobars")
-    opts.add_argument("--log-level=3")
+    cpf = SIGAM_USUARIO.replace(".", "").replace("-", "")
+    cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}" if len(cpf) == 11 else SIGAM_USUARIO
 
-    # Procura Chrome em todos os caminhos possíveis do Render/Playwright
-    caminhos_chrome_possiveis = []
-    bases_busca = [
-        "/opt/render/.cache/ms-playwright",
-        os.path.expanduser("~/.cache/ms-playwright"),
-        "/root/.cache/ms-playwright",
-        os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ""),
-    ]
-    for base in bases_busca:
-        if not base or not os.path.exists(base):
-            continue
-        # Adiciona todos os padrões possíveis
-        caminhos_chrome_possiveis.extend([
-            os.path.join(base, "chromium-*/chrome-linux/chrome"),
-            os.path.join(base, "chromium-*/chrome-linux64/chrome"),
-            os.path.join(base, "chromium_headless_shell-*/chrome-linux/headless_shell"),
-            os.path.join(base, "chromium_headless_shell-*/chrome-linux/chrome"),
-        ])
-        # Log do que está realmente lá
-        try:
-            log.info("Conteúdo de %s: %s", base, os.listdir(base))
-        except Exception:
-            pass
+    s.get(f"{SIGAM_BASE}/login.asp", timeout=30)
+    r = s.post(f"{SIGAM_BASE}/login.asp", data={
+        "txt_login": cpf_fmt,
+        "txt_senha": SIGAM_SENHA,
+        "acao": "entrar",
+    }, allow_redirects=True, timeout=30)
 
-    chrome_encontrado = None
-    for padrao in caminhos_chrome_possiveis:
-        achados = glob.glob(padrao)
-        if achados:
-            chrome_encontrado = achados[0]
-            log.info("Chrome encontrado: %s", chrome_encontrado)
+    if "login.asp" in r.url:
+        raise RuntimeError("Login no SIGAM falhou — verifique usuário/senha.")
+    log.info("SIGAM login OK — URL: %s", r.url)
+    return s
+
+
+def _sigam_buscar_processo(s: req.Session, ano: str, orgao: str, sequencial: str) -> dict:
+    """Busca processo no SIGAM e retorna cod_protocolo + numero_processo."""
+    s.get(f"{SIGAM_BASE}/protocolo/pesquisa_simples.asp?area=processo", timeout=30)
+
+    r = s.post(
+        f"{SIGAM_BASE}/protocolo/impressao.asp",
+        params={"area": "processo", "cod_impressao": "", "txt_funcao": ""},
+        data={
+            "txt_numero_ano": ano,
+            "txt_numero_orgao": orgao,
+            "txt_numero_sequencial": sequencial,
+            "acao": "PESQUISAR",
+        },
+        timeout=30,
+        allow_redirects=True,
+    )
+
+    m = re.search(r"cod_protocolo=(\d+)", r.url + r.text)
+    if not m:
+        raise RuntimeError(f"Processo {ano}/{orgao}/{sequencial} não encontrado no SIGAM.")
+
+    cod_protocolo = m.group(1)
+
+    # Extrai número do processo do HTML
+    soup = BeautifulSoup(r.text, "html.parser")
+    numero_processo = ""
+    for td in soup.find_all("td"):
+        txt = td.get_text(strip=True)
+        m2 = re.match(r"(\d{4}/\d+/\d+)", txt)
+        if m2:
+            numero_processo = m2.group(1)
             break
+    if not numero_processo:
+        numero_processo = f"{ano}/{orgao}/{sequencial}"
 
-    if chrome_encontrado:
-        opts.binary_location = chrome_encontrado
-        # Tenta usar ChromeDriverManager mesmo com binary customizado
-        try:
-            driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=opts,
-            )
-            return driver
-        except Exception as exc:
-            log.warning("ChromeDriverManager falhou: %s — tentando driver padrão", exc)
-            return webdriver.Chrome(options=opts)
+    return {"cod_protocolo": cod_protocolo, "numero_processo": numero_processo}
 
-    # Fallback completo: ChromeDriverManager sem binary location
-    log.warning("Chrome do Playwright não encontrado — usando ChromeDriverManager")
-    return webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=opts,
+
+def _sigam_coletar_docs(s: req.Session, cod_protocolo: str) -> list:
+    """Coleta documentos juntados ao processo."""
+    ACOES = ("alterar.asp", "assinar.asp", "cancelar.asp", "distribuir.asp",
+             "movimentar.asp", "comentar.asp", "vincular.asp", "pendencia.asp",
+             "responder.asp", "enquadramento.asp", "arquivar.asp")
+
+    r = s.get(
+        f"{SIGAM_BASE}/protocolo/impressao_processo.asp",
+        params={"cod_protocolo": cod_protocolo, "area": "processo"},
+        timeout=30,
     )
+    soup = BeautifulSoup(r.text, "html.parser")
+    candidatos, vistos = [], set()
+
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if not href.startswith("http"):
+            href = SIGAM_BASE + "/" + href.lstrip("/")
+        mc = re.search(r"cod_protocolo=(\d+)", href)
+        if not mc:
+            continue
+        cp = mc.group(1)
+        if cp == cod_protocolo or cp in vistos:
+            continue
+        if any(ac in href.lower() for ac in ACOES):
+            continue
+        vistos.add(cp)
+        candidatos.append((a.get_text(strip=True), href, cp))
+
+    return candidatos
 
 
-def _preencher_campo(driver, campo, valor: str) -> None:
-    driver.execute_script("arguments[0].value = '';", campo)
-    time.sleep(0.15)
-    campo.click()
-    campo.send_keys(Keys.CONTROL + "a")
-    campo.send_keys(Keys.DELETE)
-    time.sleep(0.15)
-    for ch in str(valor):
-        campo.send_keys(ch)
-        time.sleep(0.06)
-    time.sleep(0.25)
+def _sigam_extrair_rt(s: req.Session, cod: str, cod_protocolo: str, visitados: set, nivel: int = 0) -> dict:
+    """Busca dados do RT em documentos juntados recursivamente."""
+    if not cod or nivel > 3 or cod in visitados:
+        return {}
+    visitados.add(cod)
 
+    ACOES = ("alterar.asp", "assinar.asp", "cancelar.asp", "distribuir.asp",
+             "movimentar.asp", "comentar.asp", "vincular.asp", "pendencia.asp",
+             "responder.asp", "enquadramento.asp", "arquivar.asp")
 
-def _entrar_frame_principal(driver) -> None:
-    driver.switch_to.default_content()
-    frames = driver.find_elements(By.TAG_NAME, "frame") or \
-             driver.find_elements(By.TAG_NAME, "iframe")
-    if not frames:
-        return
-    for nome in ("main", "conteudo", "content", "MAIN", "corpo"):
-        try:
-            driver.switch_to.frame(nome)
-            return
-        except Exception:
-            pass
-    try:
-        driver.switch_to.frame(frames[0])
-    except Exception:
-        pass
+    for url in [
+        f"{SIGAM_BASE}/protocolo/impressao.asp?cod_protocolo={cod}&area=documento",
+        f"{SIGAM_BASE}/protocolo/impressao_processo.asp?cod_protocolo={cod}&area=processo",
+    ]:
+        r = s.get(url, timeout=30)
+        texto = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
+        rt = _extrair_rt_do_texto(texto)
+        if rt:
+            return rt
 
-
-def _obter_texto_pagina(driver) -> str:
-    MARCADORES = (
-        "RESPONSÁVEL TÉCNICO:",
-        "RESPONSAVEL TECNICO:",
-        "IDENTIFICAÇÃO DO RESPONSÁVEL TÉCNICO",
-    )
-    def _tem_rt(txt: str) -> bool:
-        return any(m in txt for m in MARCADORES)
-
-    try:
-        texto = driver.find_element(By.TAG_NAME, "body").text
-    except Exception:
-        texto = ""
-
-    if _tem_rt(texto):
-        return texto
-
-    for tag in ("frame", "iframe"):
-        for fr in driver.find_elements(By.TAG_NAME, tag):
-            try:
-                driver.switch_to.frame(fr)
-                ft = driver.find_element(By.TAG_NAME, "body").text
-                driver.switch_to.default_content()
-                if _tem_rt(ft):
-                    return ft
-            except Exception:
-                try:
-                    driver.switch_to.default_content()
-                except Exception:
-                    pass
-    return texto
+        # Busca filhos
+        soup = BeautifulSoup(r.text, "html.parser")
+        filhos, vistos_f = [], set()
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            mc = re.search(r"cod_protocolo=(\d+)", href)
+            if not mc:
+                continue
+            cf = mc.group(1)
+            if cf in (cod, cod_protocolo) or cf in vistos_f:
+                continue
+            if any(ac in href.lower() for ac in ACOES):
+                continue
+            vistos_f.add(cf)
+            filhos.append(cf)
+        for cf in reversed(filhos):
+            rt = _sigam_extrair_rt(s, cf, cod_protocolo, visitados, nivel + 1)
+            if rt:
+                return rt
+    return {}
 
 
 def _extrair_rt_do_texto(body_text: str) -> dict:
@@ -794,55 +755,176 @@ def _extrair_rt_do_texto(body_text: str) -> dict:
     return resultado
 
 
-def _extrair_rt_driver(driver) -> dict:
+# ═══════════════════════════════════════════════════════════════════
+#  SIGCAR — HELPERS via requests
+# ═══════════════════════════════════════════════════════════════════
+
+def _sigcar_session() -> req.Session:
+    """Cria sessão autenticada no SIGCAR via requests."""
+    s = req.Session()
+    s.headers.update({"User-Agent": UA})
+    s.get(SIGCAR_BASE, timeout=30)
+    r = s.post(f"{SIGCAR_BASE}/login/login.jhtml", data={
+        "j_username": SIGCAR_USUARIO,
+        "j_password": SIGCAR_SENHA,
+    }, allow_redirects=True, timeout=30)
+    if "login" in r.url.lower() and "logout" not in r.url.lower():
+        raise RuntimeError("Login no SIGCAR falhou — verifique usuário/senha.")
+    log.info("SIGCAR login OK — URL: %s", r.url)
+    return s
+
+
+def _num(texto) -> float:
+    if not texto or str(texto).strip() in ("-", ""):
+        return 0.0
     try:
-        texto = _obter_texto_pagina(driver)
-        if not texto:
-            return {}
-        resultado = _extrair_rt_do_texto(texto)
-        if resultado:
-            log.info("  RT: %s | %s",
-                     resultado.get("resp_tecnico_nome", ""),
-                     resultado.get("resp_tecnico_cpf", ""))
-        return resultado
-    except Exception as exc:
-        log.warning("  Erro RT: %s", exc)
-        return {}
+        t = re.sub(r"<[^>]+>", "", str(texto)).strip()
+        t = re.sub(r"\(.*?\)", "", t.lower().replace("ha", "")).strip()
+        return float(t.replace(".", "").replace(",", ".")) if t else 0.0
+    except Exception:
+        return 0.0
 
 
-def _varrer_frames_rt(driver) -> dict:
-    resultado = _extrair_rt_driver(driver)
-    if resultado:
-        return resultado
-    for tag in ("frame", "iframe"):
-        for fr in driver.find_elements(By.TAG_NAME, tag):
-            try:
-                driver.switch_to.frame(fr)
-                resultado = _extrair_rt_driver(driver)
-                if resultado:
-                    driver.switch_to.default_content()
-                    return resultado
-                for tag2 in ("frame", "iframe"):
-                    for sf in driver.find_elements(By.TAG_NAME, tag2):
-                        try:
-                            driver.switch_to.frame(sf)
-                            resultado = _extrair_rt_driver(driver)
-                            if resultado:
-                                driver.switch_to.default_content()
-                                return resultado
-                            driver.switch_to.parent_frame()
-                        except Exception:
-                            try: driver.switch_to.parent_frame()
-                            except Exception: pass
-                driver.switch_to.default_content()
-            except Exception:
-                try: driver.switch_to.default_content()
-                except Exception: pass
-    return {}
+def _pct(texto) -> str:
+    m = re.search(r"([\d,]+)\s*%", texto)
+    return (m.group(1).replace(",", ".") + "%") if m else ""
+
+
+def _sigcar_buscar_imovel(s: req.Session, numero_car: str) -> dict:
+    """Busca imóvel pelo número do CAR e retorna dados completos."""
+    s.get(f"{SIGCAR_BASE}/imovel/consultar/inicio.jhtml", timeout=30)
+
+    r = s.post(
+        f"{SIGCAR_BASE}/imovel/consultar.jhtml",
+        data={
+            "gerarRelatorio": "false",
+            "numeroPagina": "1",
+            "registrosPorPagina": "10",
+            "codigoCar": numero_car,
+            "nomePropriedade": "",
+            "nomeProprietario": "",
+            "cpfCnpjProprietario": "",
+            "codigoImovel": "",
+            "siglaEstado": "Tocantins",
+            "codigosTipoImovel": "todos",
+            "codigosStatusPropriedade": ["ER","EA","IN","EM","AT","CO","RE","SU","CA","PE"],
+            "codigosCondicaoPropriedade": "todos",
+            "codigosStatusPra": "todos",
+            "codigosStatusUsuario": "todos",
+            "codigosOrgaoConveniado": "-1",
+        },
+        timeout=30,
+    )
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    # Pega primeira linha da tabela de resultados (status ATIVO preferencial)
+    linhas = soup.select("table.listagem tbody tr")
+    if not linhas:
+        raise RuntimeError(f"CAR {numero_car} não encontrado no SIGCAR.")
+
+    # Prefere linha ATIVO, senão pega a primeira
+    linha = None
+    for l in linhas:
+        if "ATIVO" in l.get("class", []):
+            linha = l
+            break
+    if not linha:
+        linha = linhas[0]
+
+    tds = linha.find_all("td")
+    nome_imovel = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+    status_car  = tds[2].get_text(strip=True) if len(tds) > 2 else ""
+    municipio   = tds[4].get_text(strip=True) if len(tds) > 4 else ""
+    area_ha     = tds[5].get_text(strip=True) if len(tds) > 5 else ""
+    mod_fiscais = tds[6].get_text(strip=True) if len(tds) > 6 else ""
+    cadastrante = tds[7].get_text(strip=True) if len(tds) > 7 else ""
+    data_cad    = tds[8].get_text(strip=True) if len(tds) > 8 else ""
+
+    # Link da ficha
+    link_ficha = ""
+    a_ficha = linha.select_one("a[href*='ficha.jhtml']")
+    if a_ficha:
+        link_ficha = SIGCAR_BASE + a_ficha["href"] if not a_ficha["href"].startswith("http") else a_ficha["href"]
+
+    # Acessa ficha detalhada se disponível
+    dados_ficha = {}
+    if link_ficha:
+        dados_ficha = _sigcar_ficha(s, link_ficha)
+
+    return {
+        "nome_imovel":    nome_imovel,
+        "status_car":     status_car,
+        "municipio":      municipio,
+        "area_ha":        _num(area_ha),
+        "modulos_fiscais": _num(mod_fiscais),
+        "cadastrante":    cadastrante,
+        "data_cadastro":  data_cad,
+        **dados_ficha,
+    }
+
+
+def _sigcar_ficha(s: req.Session, url_ficha: str) -> dict:
+    """Acessa a ficha do imóvel e extrai todos os dados detalhados."""
+    r = s.get(url_ficha, timeout=30)
+    soup = BeautifulSoup(r.text, "html.parser")
+    texto = soup.get_text(separator="\n", strip=True)
+
+    def _achar(padrao):
+        m = re.search(padrao, texto, re.IGNORECASE)
+        return m.group(1).strip() if m else ""
+
+    def _td_val(id_el):
+        el = soup.find(id=id_el)
+        if not el:
+            return ""
+        tds = el.find_all("td")
+        return tds[1].get_text(strip=True) if len(tds) > 1 else el.get_text(strip=True)
+
+    # Proprietário
+    nome_req = ""
+    cpf_req  = ""
+    tabela_pf = soup.find(id="tabela_ficha_pf")
+    if tabela_pf:
+        trs = tabela_pf.find_all("tr")
+        if trs:
+            tds = trs[0].find_all("td") if trs else []
+            nome_req = tds[0].get_text(strip=True) if tds else ""
+            cpf_req  = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+
+    if not nome_req:
+        nome_req = _achar(r"Nome[^:]*:\s*\n?\s*([^\n]+)")
+    if not cpf_req:
+        cpf_req = _achar(r"CPF[^:]*:\s*\n?\s*([\d.\-/]+)")
+
+    return {
+        "nome_requerente":         nome_req,
+        "cpf_requerente":          cpf_req,
+        "area_vetorizada":         _num(_td_val("areaImovel")),
+        "area_liquida":            _num(_td_val("areaImovelLiquida")),
+        "remanescente":            _num(_td_val("vegetacaoNativa")),
+        "consolidada":             _num(_td_val("areaConsolidada")),
+        "antropizada":             _num(_td_val("areaAntropizadaApos22072008")),
+        "uso_alternativo":         _num(_td_val("areaUsoAlternativo")),
+        "pousio":                  _num(_td_val("areaPousio")),
+        "infra_publica":           _num(_td_val("areaInfraPublica")),
+        "utilidade_publica":       _num(_td_val("areaUtilidadePublica")),
+        "servidao":                _num(_td_val("areaServidaoAdm")),
+        "app":                     _num(_td_val("appGeral")),
+        "app_61a":                 _num(_td_val("appEscadinha")),
+        "app_a_recuperar":         _num(_td_val("appDegradada")),
+        "reserva_legal":           _num(_td_val("arlProposta")),
+        "reserva_legal_pct":       _pct(soup.find(id="arlProposta").get_text() if soup.find(id="arlProposta") else ""),
+        "suplementar":             _num(_td_val("arlSuplementar")),
+        "rl_a_recuperar":          _num(_td_val("arlDegradada")),
+        "reserva_legal_total":     _num(_td_val("arlTotal")),
+        "reserva_legal_total_pct": _pct(soup.find(id="arlTotal").get_text() if soup.find(id="arlTotal") else ""),
+        "arl_com_vegetacao":       _num(_td_val("arlComVegetacao")),
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  ROTAS SIGCAR (PROTEGIDAS)
+#  ROTAS SIGCAR
 # ═══════════════════════════════════════════════════════════════════
 
 @app.route("/api/buscar-car", methods=["POST", "OPTIONS"])
@@ -851,7 +933,6 @@ def buscar_car():
     if request.method == "OPTIONS":
         return jsonify({"status": "ok"}), 200
 
-    # Valida autenticação manualmente (OPTIONS não passa pelo decorator)
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return jsonify({"erro": "Token não fornecido."}), 401
@@ -863,7 +944,6 @@ def buscar_car():
     except jwt.InvalidTokenError:
         return jsonify({"erro": "Token inválido."}), 401
 
-    driver = None
     try:
         numero_car = (request.json or {}).get("car", "")
         if not numero_car:
@@ -871,131 +951,20 @@ def buscar_car():
 
         LogAcesso.registrar("busca_car", f"car={numero_car}", usuario.id)
         log.info("CAR: %s — por %s", numero_car, usuario.email)
-        driver = _criar_driver()
-        wait   = WebDriverWait(driver, 20)
 
-        def _texto(xpath, timeout=6) -> str:
-            try:
-                el = WebDriverWait(driver, timeout).until(
-                    EC.presence_of_element_located((By.XPATH, xpath)))
-                txt = el.text.strip() or el.get_attribute("value") or \
-                      el.get_attribute("innerHTML") or ""
-                return re.sub(r"<[^>]+>", "", str(txt)).strip()
-            except Exception:
-                return ""
+        s = _sigcar_session()
+        dados = _sigcar_buscar_imovel(s, str(numero_car).strip())
 
-        def _td2(id_el, timeout=6) -> str:
-            return _texto(f'//*[@id="{id_el}"]/td[2]', timeout)
-
-        def _num(texto) -> float:
-            if not texto or str(texto).strip() in ("-", ""):
-                return 0.0
-            try:
-                t = re.sub(r"<[^>]+>", "", str(texto)).strip()
-                t = re.sub(r"\(.*?\)", "", t.lower().replace("ha", "")).strip()
-                return float(t.replace(".", "").replace(",", ".")) if t else 0.0
-            except Exception:
-                return 0.0
-
-        def _pct(texto) -> str:
-            m = re.search(r"([\d,]+)\s*%", texto)
-            return (m.group(1).replace(",", ".") + "%") if m else ""
-
-        driver.get("http://sigcar.semarh.to.gov.br/")
-        wait.until(EC.presence_of_element_located((By.ID, "email"))).send_keys(SIGCAR_USUARIO)
-        driver.find_element(By.ID, "senha").send_keys(SIGCAR_SENHA)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
-        time.sleep(2)
-
-        driver.get("http://sigcar.semarh.to.gov.br/imovel/consultar/inicio.jhtml")
-        wait.until(EC.presence_of_element_located((By.ID, "codigoCar"))).send_keys(numero_car)
-        driver.find_element(By.ID, "buscarButton").click()
-        time.sleep(3)
-
-        status_car  = _texto('//*[@id="resultadoBusca"]/section/table/tbody/tr[1]/td[3]/b')
-        municipio   = _texto('//*[@id="resultadoBusca"]/section/table/tbody/tr[1]/td[5]')
-        nome_imovel = _texto('//*[@id="resultadoBusca"]/section/table/tbody/tr[1]/td[2]')
-
-        wait.until(EC.element_to_be_clickable(
-            (By.XPATH, '//*[@id="resultadoBusca"]/section/table/tbody/tr[1]/td[1]')
-        )).click()
-        time.sleep(4)
-
-        for nav_xpath in [
-            '//*[@id="MAIN"]/section/div[1]/article/div[2]/nav[1]/ul/li[1]/a',
-        ]:
-            btn = wait.until(EC.presence_of_element_located((By.XPATH, nav_xpath)))
-            driver.execute_script("arguments[0].click();", btn)
-            time.sleep(3)
-            break
-
-        area_escriturada = _num(_texto(
-            '//*[@id="MAIN"]/section/div[1]/article/div[3]/article/section[4]/div/section/div/strong'))
-
-        btn = wait.until(EC.presence_of_element_located(
-            (By.XPATH, '//*[@id="MAIN"]/section/div[1]/article/div[2]/nav[1]/ul/li[3]/a')))
-        driver.execute_script("arguments[0].click();", btn)
-        time.sleep(3)
-        data_sigcar = _texto(
-            '//*[@id="MAIN"]/section/div[1]/article/section[3]/section[2]/table[1]/tbody/tr[1]/td[2]')
-
-        btn = wait.until(EC.presence_of_element_located(
-            (By.XPATH, '//*[@id="MAIN"]/section/div[1]/article/div[2]/nav[2]/ul/li[3]/a')))
-        driver.execute_script("arguments[0].click();", btn)
-        try:
-            wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="tabela_ficha_pf"]')))
-            time.sleep(2)
-        except Exception:
-            pass
-        nome_req = _texto('//*[@id="tabela_ficha_pf"]/tbody/tr[1]/td[1]/div')
-        cpf_req  = _texto('//*[@id="tabela_ficha_pf"]/tbody/tr[1]/td[2]')
-
-        btn = wait.until(EC.presence_of_element_located(
-            (By.XPATH, '//*[@id="MAIN"]/section/div[1]/article/div[2]/nav[1]/ul/li[5]/a')))
-        driver.execute_script("arguments[0].click();", btn)
-        time.sleep(6)
-
-        return jsonify({
-            "sucesso": True,
-            "nome_requerente":         nome_req,
-            "cpf_requerente":          cpf_req,
-            "status_car":              status_car,
-            "municipio":               municipio,
-            "denominacao_imovel":      nome_imovel,
-            "data_sigcar":             data_sigcar,
-            "area_escriturada":        area_escriturada,
-            "area_vetorizada":         _num(_td2("areaImovel", 10)),
-            "area_liquida":            _num(_td2("areaImovelLiquida", 10)),
-            "remanescente":            _num(_td2("vegetacaoNativa")),
-            "consolidada":             _num(_td2("areaConsolidada")),
-            "antropizada":             _num(_td2("areaAntropizadaApos22072008")),
-            "uso_alternativo":         _num(_td2("areaUsoAlternativo")),
-            "pousio":                  _num(_td2("areaPousio")),
-            "infra_publica":           _num(_td2("areaInfraPublica")),
-            "utilidade_publica":       _num(_td2("areaUtilidadePublica")),
-            "servidao":                _num(_td2("areaServidaoAdm")),
-            "app":                     _num(_td2("appGeral")),
-            "app_61a":                 _num(_td2("appEscadinha")),
-            "app_a_recuperar":         _num(_td2("appDegradada")),
-            "reserva_legal":           _num(_td2("arlProposta")),
-            "reserva_legal_pct":       _pct(_texto('//*[@id="arlProposta"]')),
-            "suplementar":             _num(_td2("arlSuplementar")),
-            "rl_a_recuperar":          _num(_td2("arlDegradada")),
-            "reserva_legal_total":     _num(_td2("arlTotal")),
-            "reserva_legal_total_pct": _pct(_texto('//*[@id="arlTotal"]')),
-            "arl_com_vegetacao":       _num(_td2("arlComVegetacao")),
-        })
+        log.info("SIGCAR OK: car=%s municipio=%s", numero_car, dados.get("municipio"))
+        return jsonify({"sucesso": True, **dados})
 
     except Exception as exc:
         log.error("CAR erro: %s", exc)
         return jsonify({"sucesso": False, "mensagem": str(exc)})
-    finally:
-        if driver:
-            driver.quit()
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  ROTAS SIGAM (PROTEGIDAS)
+#  ROTAS SIGAM
 # ═══════════════════════════════════════════════════════════════════
 
 @app.route("/api/buscar-sigam", methods=["POST", "OPTIONS"])
@@ -1004,27 +973,16 @@ def buscar_sigam():
         return jsonify({"status": "ok"}), 200
 
     auth = request.headers.get("Authorization", "")
-    log.info("SIGAM auth header (primeiros 30 chars): %s", auth[:30] if auth else "VAZIO")
     if not auth.startswith("Bearer "):
-        log.warning("SIGAM: token não enviado ou formato inválido")
         return jsonify({"erro": "Token não fornecido."}), 401
-    token_str = auth[7:]
-    log.info("SIGAM token (primeiros 30 chars): %s", token_str[:30])
     try:
-        payload  = _validar_token(token_str)
-        log.info("SIGAM token válido para usuário id=%s", int(payload.get("sub", 0)) if payload.get("sub") else None)
+        payload  = _validar_token(auth[7:])
         usuario  = db.session.get(Usuario, int(payload["sub"]))
         if not usuario or not usuario.ativo:
-            log.warning("SIGAM: usuário não encontrado ou inativo")
             return jsonify({"erro": "Usuário inativo."}), 403
     except jwt.InvalidTokenError as e:
-        log.error("SIGAM token rejeitado: %s", e)
         return jsonify({"erro": "Token inválido: " + str(e)}), 401
-    except Exception as e:
-        log.error("SIGAM erro inesperado na auth: %s", e)
-        return jsonify({"erro": "Erro de autenticação: " + str(e)}), 401
 
-    driver = None
     try:
         dados      = request.json or {}
         ano        = str(dados.get("ano", "")).strip()
@@ -1036,170 +994,40 @@ def buscar_sigam():
 
         LogAcesso.registrar("busca_sigam", f"{ano}/{orgao}/{sequencial}", usuario.id)
         log.info("SIGAM: %s/%s/%s — por %s", ano, orgao, sequencial, usuario.email)
-        driver = _criar_driver()
-        wait   = WebDriverWait(driver, 30)
 
-        driver.get(f"{SIGAM_BASE}/login.asp")
-        wait.until(EC.presence_of_element_located((By.NAME, "txt_login"))).send_keys(SIGAM_USUARIO)
-        driver.find_element(By.NAME, "txt_senha").send_keys(SIGAM_SENHA)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
-        wait.until(lambda d: "login.asp" not in d.current_url)
-        time.sleep(3)
-        _entrar_frame_principal(driver)
-
-        wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="processo"]/span'))).click()
-        time.sleep(2)
-        wait.until(EC.element_to_be_clickable(
-            (By.XPATH, '//*[@id="sidebar-wrapper"]/div[3]/div/ul/li[9]/ul/li[5]/a')
-        )).click()
-        time.sleep(3)
-
-        _preencher_campo(driver,
-            wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="txt_numero_ano"]'))), ano)
-        _preencher_campo(driver,
-            driver.find_element(By.XPATH, '//*[@id="txt_numero_orgao"]'), orgao)
-        _preencher_campo(driver,
-            driver.find_element(By.XPATH, '//*[@id="txt_numero_sequencial"]'), sequencial)
-
-        driver.find_element(By.XPATH, '//*[@id="wrapper"]/div[3]/div/div/div/form').submit()
-        time.sleep(5)
-
-        try:
-            alert = driver.switch_to.alert
-            msg = alert.text
-            alert.accept()
-            return jsonify({"sucesso": False, "mensagem": msg})
-        except Exception:
-            pass
-
-        url_submit = driver.current_url
-        m = re.search(r"cod_protocolo=(\d+)", url_submit)
-        cod_protocolo = m.group(1) if m else ""
-
-        numero_processo = ""
-        driver.switch_to.default_content()
-        for xp in ('//*[@id="wrapper"]/div[3]/div/div/div/table/tbody/tr[2]', '//table/tbody/tr[2]'):
-            try:
-                txt = driver.find_element(By.XPATH, xp).text.strip()
-                m2  = re.match(r"(\d{4}/\d+/\d+)", txt)
-                if m2:
-                    numero_processo = m2.group(1)
-                    break
-            except Exception:
-                pass
-
-        if not numero_processo and cod_protocolo:
-            numero_processo = f"(cod={cod_protocolo})"
-
-        if not cod_protocolo:
-            raise RuntimeError(f"cod_protocolo não encontrado: {url_submit}")
+        s = _sigam_session()
+        proc = _sigam_buscar_processo(s, ano, orgao, sequencial)
+        cod_protocolo   = proc["cod_protocolo"]
+        numero_processo = proc["numero_processo"]
 
         # Coleta documentos juntados
-        ACOES = ("alterar.asp", "assinar.asp", "cancelar.asp", "distribuir.asp",
-                 "movimentar.asp", "comentar.asp", "vincular.asp", "pendencia.asp",
-                 "responder.asp", "enquadramento.asp", "arquivar.asp")
+        docs = _sigam_coletar_docs(s, cod_protocolo)
+        cp_ultimo = docs[-1][2] if docs else ""
+        numero_requerimento = (docs[-1][0] or f"cod={cp_ultimo}") if docs else ""
 
-        def _coletar_docs() -> list:
-            candidatos, vistos = [], set()
-            def _varrer():
-                try:
-                    for a in driver.find_elements(By.XPATH, "//a[@href]"):
-                        href = (a.get_attribute("href") or "").strip()
-                        txt  = a.text.strip()
-                        mc = re.search(r"cod_protocolo=(\d+)", href)
-                        if not mc: continue
-                        cp = mc.group(1)
-                        if cp == cod_protocolo or cp in vistos: continue
-                        if any(ac in href.lower() for ac in ACOES): continue
-                        vistos.add(cp)
-                        candidatos.append((txt, href, cp))
-                except Exception: pass
+        # Busca RT
+        visitados: set = set()
+        dados_rt = _sigam_extrair_rt(s, cp_ultimo, cod_protocolo, visitados) if cp_ultimo else {}
 
-            driver.switch_to.default_content()
-            _varrer()
-            for tag in ("frame", "iframe"):
-                for fr in driver.find_elements(By.TAG_NAME, tag):
-                    try:
-                        driver.switch_to.frame(fr)
-                        _varrer()
-                        for sf in (driver.find_elements(By.TAG_NAME, "frame") +
-                                   driver.find_elements(By.TAG_NAME, "iframe")):
-                            try:
-                                driver.switch_to.frame(sf)
-                                _varrer()
-                                driver.switch_to.parent_frame()
-                            except Exception:
-                                try: driver.switch_to.parent_frame()
-                                except Exception: pass
-                        driver.switch_to.default_content()
-                    except Exception:
-                        try: driver.switch_to.default_content()
-                        except Exception: pass
-            return candidatos
-
-        docs_juntados = _coletar_docs()
-        cp_ultimo = docs_juntados[-1][2] if docs_juntados else ""
-        numero_requerimento = (docs_juntados[-1][0] or f"cod={cp_ultimo}") if docs_juntados else ""
-
-        visitados_rt: set = set()
-
-        def _buscar_rt(cp: str, nivel: int = 0) -> dict:
-            if not cp or nivel > 3 or cp in visitados_rt:
-                return {}
-            visitados_rt.add(cp)
-
-            for url in [
-                f"{SIGAM_BASE}/protocolo/impressao.asp?cod_protocolo={cp}&area=documento",
-                f"{SIGAM_BASE}/protocolo/impressao_processo.asp?cod_protocolo={cp}&area=processo",
+        # Tenta extrair nº do requerimento se não encontrado
+        if not dados_rt.get("num_requerimento_doc") and docs:
+            cp_primeiro = docs[0][2]
+            r = s.get(
+                f"{SIGAM_BASE}/protocolo/impressao.asp",
+                params={"cod_protocolo": cp_primeiro, "area": "documento"},
+                timeout=30,
+            )
+            txt = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
+            for padrao in [
+                r"REQUERIMENTO\s+([\d][\d\-/]+[\d])",
+                r"N[\u00ba\u00b0]\s*:?\s*([\d]+/\d{4})",
+                r"IDENTIFICAÇÃO[:\s]+([\d][\d\-/]+[\d])",
+                r"ORIGEM[:\s]+([\d]+/\d{4})",
             ]:
-                driver.switch_to.default_content()
-                driver.get(url)
-                time.sleep(5)
-                rt = _varrer_frames_rt(driver)
-                if rt:
-                    return rt
-                filhos, vistos_f = [], set()
-                try:
-                    for a in driver.find_elements(By.XPATH, "//a[@href]"):
-                        href = (a.get_attribute("href") or "").strip()
-                        mc = re.search(r"cod_protocolo=(\d+)", href)
-                        if not mc: continue
-                        cf = mc.group(1)
-                        if cf in (cp, cod_protocolo) or cf in vistos_f: continue
-                        if any(ac in href.lower() for ac in ACOES): continue
-                        vistos_f.add(cf); filhos.append(cf)
-                except Exception: pass
-                for cf in reversed(filhos):
-                    rt = _buscar_rt(cf, nivel + 1)
-                    if rt: return rt
-            return {}
-
-        dados_rt = _buscar_rt(cp_ultimo) if cp_ultimo else {}
-
-        num_req_final = dados_rt.get("num_requerimento_doc", "")
-        if not num_req_final and docs_juntados:
-            cp_primeiro = docs_juntados[0][2]
-            try:
-                driver.switch_to.default_content()
-                driver.get(f"{SIGAM_BASE}/protocolo/impressao.asp?cod_protocolo={cp_primeiro}&area=documento")
-                time.sleep(4)
-                txt_orig = _obter_texto_pagina(driver)
-                if txt_orig:
-                    for padrao in [
-                        r"REQUERIMENTO\s+([\d][\d\-/]+[\d])",
-                        r"N[\u00ba\u00b0]\s*:?\s*([\d]+/\d{4})",
-                        r"IDENTIFICAÇÃO[:\s]+([\d][\d\-/]+[\d])",
-                        r"ORIGEM[:\s]+([\d]+/\d{4})",
-                    ]:
-                        m3 = re.search(padrao, txt_orig, re.IGNORECASE)
-                        if m3:
-                            num_req_final = m3.group(1).strip()
-                            break
-            except Exception as exc:
-                log.warning("Nº req: %s", exc)
-
-        if num_req_final:
-            dados_rt["num_requerimento_doc"] = num_req_final
+                m3 = re.search(padrao, txt, re.IGNORECASE)
+                if m3:
+                    dados_rt["num_requerimento_doc"] = m3.group(1).strip()
+                    break
 
         log.info("SIGAM OK: proc=%s RT=%s", numero_processo, bool(dados_rt))
         return jsonify({
@@ -1212,17 +1040,12 @@ def buscar_sigam():
     except Exception as exc:
         log.error("SIGAM erro: %s", exc)
         return jsonify({"sucesso": False, "mensagem": str(exc)})
-    finally:
-        if driver:
-            driver.quit()
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  HEALTHCHECK
+#  HEALTHCHECK E SEGURANÇA
 # ═══════════════════════════════════════════════════════════════════
 
-# Garante que o banco é inicializado quando o servidor acorda
-# Roda uma única vez na primeira requisição após restart
 _banco_inicializado = False
 
 @app.before_request
@@ -1235,12 +1058,10 @@ def garantir_banco():
             log.info("Banco inicializado automaticamente.")
         except Exception as e:
             log.error("Erro ao inicializar banco: %s", e)
-            # Não bloqueia a requisição — tenta continuar mesmo com erro no banco
 
 
 @app.route("/init-db", methods=["GET"])
 def init_db_manual():
-    """Rota para forçar a inicialização do banco manualmente se necessário."""
     try:
         _inicializar_banco()
         return jsonify({"status": "ok", "mensagem": "Banco inicializado com sucesso."})
@@ -1253,11 +1074,6 @@ def health():
     return jsonify({"status": "ok", "service": "naturatins-parecer"})
 
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  HEADERS DE SEGURANÇA (aplicados em todas as respostas)
-# ═══════════════════════════════════════════════════════════════════
-
 @app.after_request
 def aplicar_headers_seguranca(response):
     response.headers["X-Content-Type-Options"]    = "nosniff"
@@ -1266,17 +1082,15 @@ def aplicar_headers_seguranca(response):
     response.headers["Referrer-Policy"]            = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"]         = "geolocation=(), microphone=(), camera=()"
     response.headers["Strict-Transport-Security"]  = "max-age=31536000; includeSubDomains"
-    # Remove cabeçalho que revela tecnologia
     response.headers.pop("Server", None)
     return response
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  INICIALIZAÇÃO DO BANCO E ADMIN PADRÃO
+#  INICIALIZAÇÃO DO BANCO
 # ═══════════════════════════════════════════════════════════════════
 
 def _inicializar_banco():
-    """Cria as tabelas e o usuário admin inicial se não existir."""
     db.create_all()
     admin = Usuario.query.filter_by(email=ADMIN_EMAIL).first()
     if not admin:

@@ -2,16 +2,8 @@ services:
   - type: web
     name: naturatins-parecer
     runtime: python
-    buildCommand: |
-      apt-get update -qq
-      apt-get install -y -qq chromium-driver chromium
-      pip install -r requirements.txt
-    startCommand: >
-      gunicorn app:app
-      --bind 0.0.0.0:$PORT
-      --timeout 120
-      --workers 1
-      --preload
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -21,20 +13,16 @@ services:
         fromDatabase:
           name: naturatins-db
           property: connectionString
-      # ── Gere com: python -c "import secrets; print(secrets.token_hex(64))"
       - key: JWT_SECRET
         sync: false
       - key: JWT_EXPIRES_HORAS
         value: "8"
-      # ── URL(s) do seu GitHub Pages (separadas por vírgula)
       - key: ORIGENS_PERMITIDAS
         sync: false
-      # ── Conta admin inicial
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_SENHA_INICIAL
         sync: false
-      # ── SIGCAR e SIGAM
       - key: SIGCAR_USUARIO
         sync: false
       - key: SIGCAR_SENHA
