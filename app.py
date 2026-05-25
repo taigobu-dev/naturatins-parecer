@@ -109,9 +109,12 @@ class Usuario(db.Model):
         ).decode()
 
     def esta_bloqueado(self) -> bool:
-        if self.bloqueado_ate and self.bloqueado_ate > datetime.now(timezone.utc):
-            return True
-        return False
+        if not self.bloqueado_ate:
+            return False
+        bloqueado = self.bloqueado_ate
+        if bloqueado.tzinfo is None:
+            bloqueado = bloqueado.replace(tzinfo=timezone.utc)
+        return bloqueado > datetime.now(timezone.utc)
 
     def registrar_falha(self) -> None:
         self.tentativas_login = (self.tentativas_login or 0) + 1
