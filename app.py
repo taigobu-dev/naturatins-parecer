@@ -1314,6 +1314,20 @@ def aplicar_headers_seguranca(response):
 
 def _inicializar_banco():
     db.create_all()
+
+    # Migração automática — adiciona colunas novas se ainda não existirem
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(db.text("""
+                ALTER TABLE usuarios
+                ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128),
+                ADD COLUMN IF NOT EXISTS reset_token_expira TIMESTAMP;
+            """))
+            conn.commit()
+        log.info("Migração de colunas reset_token concluída (ou já existiam).")
+    except Exception as e:
+        log.warning("Migração reset_token ignorada: %s", e)
+
     admin = Usuario.query.filter_by(email=ADMIN_EMAIL).first()
     if not admin:
         senha = ADMIN_SENHA_INI or secrets.token_urlsafe(16)
@@ -1330,27 +1344,6 @@ def _inicializar_banco():
             log.warning("=" * 60)
         else:
             log.info("Admin inicial criado: %s", ADMIN_EMAIL)
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  MIGRAÇÃO — REMOVER APÓS USO
-# ═══════════════════════════════════════════════════════════════════
-
-@app.route("/admin/migrar-reset-token/<chave>", methods=["GET"])
-def migrar_reset_token(chave):
-    if chave != "naturatins2026migrate":
-        return jsonify({"erro": "Chave inválida."}), 403
-    try:
-        with db.engine.connect() as conn:
-            conn.execute(db.text("""
-                ALTER TABLE usuarios
-                ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128),
-                ADD COLUMN IF NOT EXISTS reset_token_expira TIMESTAMP;
-            """))
-            conn.commit()
-        return jsonify({"mensagem": "Migração concluída com sucesso."})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════
