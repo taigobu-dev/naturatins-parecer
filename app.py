@@ -4,9 +4,7 @@ API Flask com autenticação JWT, banco PostgreSQL e segurança profissional.
 Deploy: Render.com — SEM Selenium, usa requests puro.
 """
 
-import os, re, time, logging, secrets, smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os, re, time, logging, secrets
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -78,13 +76,10 @@ SIGAM_SENHA    = os.environ.get("SIGAM_SENHA",    "")
 SIGAM_BASE     = "https://sigam.to.gov.br/proton"
 SIGCAR_BASE    = "http://sigcar.semarh.to.gov.br"
 
-# E-mail (Gmail ou SMTP institucional)
-SMTP_HOST     = os.environ.get("SMTP_HOST",     "smtp.gmail.com")
-SMTP_PORT     = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USUARIO  = os.environ.get("SMTP_USUARIO",  "")
-SMTP_SENHA    = os.environ.get("SMTP_SENHA",    "")
-EMAIL_REMETENTE = os.environ.get("EMAIL_REMETENTE", SMTP_USUARIO)
-FRONTEND_URL  = os.environ.get("FRONTEND_URL",  "https://taigobu-dev.github.io/naturatins-parecer")
+# E-mail via API HTTP do Brevo (não usa SMTP — funciona no Render gratuito)
+BREVO_API_KEY   = os.environ.get("BREVO_API_KEY",  "")
+EMAIL_REMETENTE = os.environ.get("EMAIL_REMETENTE", "")
+FRONTEND_URL    = os.environ.get("FRONTEND_URL",    "https://taigobu-dev.github.io/naturatins-parecer")
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
 
@@ -394,27 +389,11 @@ def _validar_forca_senha(senha: str) -> str:
 
 
 def _enviar_email_reset(destinatario: str, nome: str, token: str) -> bool:
-    if not SMTP_USUARIO or not SMTP_SENHA:
-        log.warning("SMTP não configurado — e-mail de reset não enviado.")
+    if not BREVO_API_KEY or not EMAIL_REMETENTE:
+        log.warning("Brevo não configurado — e-mail de reset não enviado.")
         return False
     try:
         link = f"{FRONTEND_URL}?reset_token={token}"
-        msg  = MIMEMultipart("alternative")
-        msg["Subject"] = "Recuperação de senha — NATURATINS"
-        msg["From"]    = f"NATURATINS <{EMAIL_REMETENTE}>"
-        msg["To"]      = destinatario
-
-        texto = f"""Olá, {nome}!
-
-Recebemos uma solicitação de recuperação de senha para sua conta NATURATINS.
-
-Clique no link abaixo para cadastrar uma nova senha (válido por 1 hora):
-{link}
-
-Se não foi você quem solicitou, ignore este e-mail.
-
-Atenciosamente,
-Sistema NATURATINS"""
 
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#f9f9f9;padding:32px;border-radius:12px;">
@@ -446,16 +425,29 @@ Sistema NATURATINS"""
   </p>
 </div>"""
 
-        msg.attach(MIMEText(texto, "plain", "utf-8"))
-        msg.attach(MIMEText(html,  "html",  "utf-8"))
+        texto = (f"Olá, {nome}!\n\nRecebemos uma solicitação de recuperação de senha.\n"
+                 f"Acesse o link abaixo para criar uma nova senha (válido por 1 hora):\n{link}\n\n"
+                 f"Se não foi você, ignore este e-mail.")
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as servidor:
-            servidor.ehlo()
-            servidor.starttls()
-            servidor.login(SMTP_USUARIO, SMTP_SENHA)
-            servidor.sendmail(EMAIL_REMETENTE, destinatario, msg.as_string())
+        payload = {
+            "sender":     {"name": "NATURATINS", "email": EMAIL_REMETENTE},
+            "to":         [{"email": destinatario, "name": nome}],
+            "subject":    "Recuperação de senha — NATURATINS",
+            "htmlContent": html,
+            "textContent": texto,
+        }
 
-        log.info("E-mail de reset enviado para %s", destinatario)
+        r = req.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key":      BREVO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+        r.raise_for_status()
+        log.info("E-mail de reset enviado para %s (Brevo API)", destinatario)
         return True
 
     except Exception as exc:
