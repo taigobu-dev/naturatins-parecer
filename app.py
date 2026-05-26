@@ -1333,6 +1333,27 @@ def _inicializar_banco():
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  MIGRAÇÃO — REMOVER APÓS USO
+# ═══════════════════════════════════════════════════════════════════
+
+@app.route("/admin/migrar-reset-token/<chave>", methods=["GET"])
+def migrar_reset_token(chave):
+    if chave != "naturatins2026migrate":
+        return jsonify({"erro": "Chave inválida."}), 403
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(db.text("""
+                ALTER TABLE usuarios
+                ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128),
+                ADD COLUMN IF NOT EXISTS reset_token_expira TIMESTAMP;
+            """))
+            conn.commit()
+        return jsonify({"mensagem": "Migração concluída com sucesso."})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════
 
