@@ -4,7 +4,9 @@ API Flask com autenticação JWT, banco PostgreSQL e segurança profissional.
 Deploy: Render.com — SEM Selenium, usa requests puro.
 """
 
-import os, re, time, logging, secrets
+import os, re, time, logging, secrets, smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -76,6 +78,14 @@ SIGAM_SENHA    = os.environ.get("SIGAM_SENHA",    "")
 SIGAM_BASE     = "https://sigam.to.gov.br/proton"
 SIGCAR_BASE    = "http://sigcar.semarh.to.gov.br"
 
+# E-mail (Gmail ou SMTP institucional)
+SMTP_HOST     = os.environ.get("SMTP_HOST",     "smtp.gmail.com")
+SMTP_PORT     = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USUARIO  = os.environ.get("SMTP_USUARIO",  "")
+SMTP_SENHA    = os.environ.get("SMTP_SENHA",    "")
+EMAIL_REMETENTE = os.environ.get("EMAIL_REMETENTE", SMTP_USUARIO)
+FRONTEND_URL  = os.environ.get("FRONTEND_URL",  "https://taigobu-dev.github.io/naturatins-parecer")
+
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
 
 
@@ -94,8 +104,10 @@ class Usuario(db.Model):
     ativo         = db.Column(db.Boolean, nullable=False, default=True)
     criado_em     = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     ultimo_acesso = db.Column(db.DateTime, nullable=True)
-    tentativas_login = db.Column(db.Integer, default=0)
-    bloqueado_ate    = db.Column(db.DateTime, nullable=True)
+    tentativas_login  = db.Column(db.Integer, default=0)
+    bloqueado_ate     = db.Column(db.DateTime, nullable=True)
+    reset_token       = db.Column(db.String(128), nullable=True, index=True)
+    reset_token_expira = db.Column(db.DateTime, nullable=True)
 
     pareceres = db.relationship("Parecer", backref="autor", lazy=True)
     logs      = db.relationship("LogAcesso", backref="usuario", lazy=True)
@@ -125,6 +137,24 @@ class Usuario(db.Model):
     def resetar_tentativas(self) -> None:
         self.tentativas_login = 0
         self.bloqueado_ate    = None
+
+    def gerar_reset_token(self) -> str:
+        token = secrets.token_urlsafe(48)
+        self.reset_token        = token
+        self.reset_token_expira = datetime.now(timezone.utc) + timedelta(hours=1)
+        return token
+
+    def reset_token_valido(self, token: str) -> bool:
+        if not self.reset_token or not self.reset_token_expira:
+            return False
+        expira = self.reset_token_expira
+        if expira.tzinfo is None:
+            expira = expira.replace(tzinfo=timezone.utc)
+        return self.reset_token == token and expira > datetime.now(timezone.utc)
+
+    def limpar_reset_token(self) -> None:
+        self.reset_token        = None
+        self.reset_token_expira = None
 
     def to_dict(self) -> dict:
         return {
@@ -361,6 +391,153 @@ def _validar_forca_senha(senha: str) -> str:
     if not re.search(r"[!@#$%^&*()_+\-=\[\]{}|;':\",./<>?]", senha):
         return "A senha deve conter pelo menos um caractere especial."
     return ""
+
+
+def _enviar_email_reset(destinatario: str, nome: str, token: str) -> bool:
+    if not SMTP_USUARIO or not SMTP_SENHA:
+        log.warning("SMTP não configurado — e-mail de reset não enviado.")
+        return False
+    try:
+        link = f"{FRONTEND_URL}?reset_token={token}"
+        msg  = MIMEMultipart("alternative")
+        msg["Subject"] = "Recuperação de senha — NATURATINS"
+        msg["From"]    = f"NATURATINS <{EMAIL_REMETENTE}>"
+        msg["To"]      = destinatario
+
+        texto = f"""Olá, {nome}!
+
+Recebemos uma solicitação de recuperação de senha para sua conta NATURATINS.
+
+Clique no link abaixo para cadastrar uma nova senha (válido por 1 hora):
+{link}
+
+Se não foi você quem solicitou, ignore este e-mail.
+
+Atenciosamente,
+Sistema NATURATINS"""
+
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#f9f9f9;padding:32px;border-radius:12px;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <div style="font-size:36px;">🌿</div>
+    <h2 style="color:#1a5c1e;margin:8px 0 4px;">NATURATINS</h2>
+    <p style="color:#607d8b;font-size:13px;margin:0;">Sistema de Geração de Pareceres Técnicos</p>
+  </div>
+  <div style="background:white;border-radius:8px;padding:24px;border:1px solid #e0e0e0;">
+    <p style="color:#37474f;font-size:15px;">Olá, <strong>{nome}</strong>!</p>
+    <p style="color:#546e7a;font-size:14px;line-height:1.6;">
+      Recebemos uma solicitação de recuperação de senha para sua conta.<br>
+      Clique no botão abaixo para cadastrar uma nova senha.<br>
+      <strong>O link é válido por 1 hora.</strong>
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="{link}" style="background:#1a5c1e;color:white;padding:13px 32px;border-radius:7px;
+         text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+        🔑 Redefinir minha senha
+      </a>
+    </div>
+    <p style="color:#90a4ae;font-size:12px;text-align:center;">
+      Se não foi você quem solicitou, ignore este e-mail.<br>
+      Sua senha permanece a mesma.
+    </p>
+  </div>
+  <p style="color:#b0bec5;font-size:11px;text-align:center;margin-top:16px;">
+    NATURATINS — Instituto Natureza do Tocantins
+  </p>
+</div>"""
+
+        msg.attach(MIMEText(texto, "plain", "utf-8"))
+        msg.attach(MIMEText(html,  "html",  "utf-8"))
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as servidor:
+            servidor.ehlo()
+            servidor.starttls()
+            servidor.login(SMTP_USUARIO, SMTP_SENHA)
+            servidor.sendmail(EMAIL_REMETENTE, destinatario, msg.as_string())
+
+        log.info("E-mail de reset enviado para %s", destinatario)
+        return True
+
+    except Exception as exc:
+        log.error("Falha ao enviar e-mail de reset: %s", exc)
+        return False
+
+
+@app.route("/auth/solicitar-reset", methods=["POST", "OPTIONS"])
+@limiter.limit("5 per hour")
+def solicitar_reset():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
+    dados = request.get_json(silent=True) or {}
+    email = str(dados.get("email", "")).strip().lower()
+
+    # Resposta genérica — não revela se e-mail existe
+    RESP_OK = {"mensagem": "Se este e-mail estiver cadastrado, você receberá as instruções em breve."}
+
+    if not email or not re.match(r"^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$", email):
+        return jsonify(RESP_OK)
+
+    usuario = Usuario.query.filter_by(email=email).first()
+    if not usuario or not usuario.ativo:
+        return jsonify(RESP_OK)
+
+    token = usuario.gerar_reset_token()
+    db.session.commit()
+
+    _enviar_email_reset(usuario.email, usuario.nome, token)
+    LogAcesso.registrar("reset_solicitado", f"email={email}", usuario.id)
+    return jsonify(RESP_OK)
+
+
+@app.route("/auth/redefinir-senha", methods=["POST", "OPTIONS"])
+@limiter.limit("10 per hour")
+def redefinir_senha():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
+    dados       = request.get_json(silent=True) or {}
+    token       = str(dados.get("token", "")).strip()
+    senha_nova  = str(dados.get("senha_nova", ""))
+
+    if not token or not senha_nova:
+        return jsonify({"erro": "Token e nova senha são obrigatórios."}), 400
+
+    usuario = Usuario.query.filter_by(reset_token=token).first()
+    if not usuario or not usuario.reset_token_valido(token):
+        return jsonify({"erro": "Link inválido ou expirado. Solicite um novo."}), 400
+
+    erros = _validar_forca_senha(senha_nova)
+    if erros:
+        return jsonify({"erro": erros}), 400
+
+    usuario.definir_senha(senha_nova)
+    usuario.limpar_reset_token()
+    usuario.resetar_tentativas()
+    db.session.commit()
+
+    LogAcesso.registrar("senha_redefinida", f"email={usuario.email}", usuario.id)
+    log.info("Senha redefinida via reset: %s", usuario.email)
+    return jsonify({"mensagem": "Senha redefinida com sucesso! Você já pode fazer login."})
+
+
+@app.route("/auth/validar-token-reset", methods=["POST", "OPTIONS"])
+def validar_token_reset():
+    """Verifica se um token de reset é válido antes de exibir o formulário."""
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
+    dados = request.get_json(silent=True) or {}
+    token = str(dados.get("token", "")).strip()
+
+    if not token:
+        return jsonify({"valido": False}), 400
+
+    usuario = Usuario.query.filter_by(reset_token=token).first()
+    if not usuario or not usuario.reset_token_valido(token):
+        return jsonify({"valido": False, "erro": "Link inválido ou expirado."}), 400
+
+    return jsonify({"valido": True, "nome": usuario.nome})
 
 
 # ═══════════════════════════════════════════════════════════════════

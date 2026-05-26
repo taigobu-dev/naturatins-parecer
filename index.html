@@ -173,6 +173,41 @@
         }
         .btn-olho:hover { color: #37474f; }
 
+        /* ══ TELA RECUPERAÇÃO DE SENHA ══════════════════════════════ */
+        #reset-screen {
+            position: fixed; inset: 0; z-index: 9998;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #0d3e10 0%, #1a5c1e 50%, #1565c0 100%);
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        #reset-screen.oculto { display: none; }
+        .reset-card {
+            background: white; border-radius: 16px; padding: 40px 36px;
+            width: 100%; max-width: 420px; box-shadow: 0 24px 64px rgba(0,0,0,.35);
+        }
+        .reset-card h2 { color: #1a5c1e; font-size: 18px; margin: 0 0 6px; }
+        .reset-card p  { color: #607d8b; font-size: 13px; margin: 0 0 22px; line-height: 1.5; }
+        .reset-field { margin-bottom: 14px; }
+        .reset-field label { display:block; font-size:12.5px; font-weight:700; color:#37474f; margin-bottom:5px; }
+        .reset-field input {
+            width:100%; padding:10px 12px; border:1.5px solid #b0bec5;
+            border-radius:7px; font-size:14px; outline:none; transition:border .2s;
+        }
+        .reset-field input:focus { border-color:#1565c0; }
+        .btn-reset {
+            width:100%; padding:12px; background:#1a5c1e; color:white;
+            border:none; border-radius:7px; font-size:15px; font-weight:700;
+            cursor:pointer; margin-top:4px; transition:background .2s;
+        }
+        .btn-reset:hover { background:#0d3e10; }
+        .reset-msg { font-size:13px; margin-top:12px; text-align:center; min-height:18px; line-height:1.5; }
+        .reset-msg.ok   { color:#2e7d32; }
+        .reset-msg.erro { color:#c62828; }
+        .link-voltar {
+            display:block; text-align:center; margin-top:16px;
+            color:#1565c0; font-size:13px; cursor:pointer; text-decoration:underline;
+        }
+
         /* ══ PAINEL ADMIN ═══════════════════════════════════════════ */
         #painel-admin {
             position: fixed; inset: 0; z-index: 8000;
@@ -331,6 +366,65 @@
     <button class="btn-login" onclick="fazerLogin()">Entrar</button>
     <div class="login-erro" id="login_erro"></div>
     <div class="login-loading oculto" id="login_loading">Verificando credenciais...</div>
+    <div style="text-align:center;margin-top:14px;">
+      <span onclick="abrirRecuperarSenha()"
+        style="color:#1565c0;font-size:13px;cursor:pointer;text-decoration:underline;">
+        Esqueci minha senha
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--               TELA RECUPERAÇÃO DE SENHA                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="reset-screen" class="oculto">
+  <div class="reset-card" id="reset-card-solicitar">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:36px;">🔑</div>
+      <h2>Recuperar Senha</h2>
+      <p>Digite seu e-mail institucional e enviaremos um link para criar uma nova senha.</p>
+    </div>
+    <div class="reset-field">
+      <label>E-mail institucional</label>
+      <input type="email" id="reset_email" placeholder="nome@naturatins.to.gov.br"
+             onkeydown="if(event.key==='Enter') solicitarReset()">
+    </div>
+    <button class="btn-reset" onclick="solicitarReset()" id="btn-solicitar-reset">
+      Enviar link de recuperação
+    </button>
+    <div class="reset-msg" id="reset-msg-solicitar"></div>
+    <span class="link-voltar" onclick="voltarParaLogin()">← Voltar para o login</span>
+  </div>
+
+  <div class="reset-card oculto" id="reset-card-nova-senha">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:36px;">🔒</div>
+      <h2>Nova Senha</h2>
+      <p id="reset-nova-boas-vindas">Cadastre sua nova senha de acesso.</p>
+    </div>
+    <div class="reset-field">
+      <label>Nova senha</label>
+      <div class="pwd-wrap">
+        <input type="password" id="reset_senha_nova" placeholder="Mínimo 10 caracteres">
+        <button type="button" class="btn-olho" onclick="toggleSenha('reset_senha_nova', this)">👁</button>
+      </div>
+    </div>
+    <div class="reset-field">
+      <label>Confirmar nova senha</label>
+      <div class="pwd-wrap">
+        <input type="password" id="reset_senha_confirma" placeholder="Repita a nova senha"
+               onkeydown="if(event.key==='Enter') confirmarRedefinicao()">
+        <button type="button" class="btn-olho" onclick="toggleSenha('reset_senha_confirma', this)">👁</button>
+      </div>
+    </div>
+    <button class="btn-reset" onclick="confirmarRedefinicao()" id="btn-confirmar-reset">
+      Salvar nova senha
+    </button>
+    <div class="reset-msg" id="reset-msg-nova"></div>
+    <div style="font-size:11.5px;color:#90a4ae;margin-top:12px;line-height:1.5;text-align:center;">
+      Mínimo 10 caracteres · 1 maiúscula · 1 minúscula · 1 número · 1 especial (!@#$%...)
+    </div>
   </div>
 </div>
 
@@ -1498,6 +1592,15 @@ function ativarSistema(usuario) {
     if (usuario.perfil === 'admin') {
         document.getElementById('btn-painel-admin').classList.remove('oculto');
     }
+    // Preenche automaticamente o campo Analista com o nome do usuário logado
+    const campoAnalista = document.getElementById('analista_nome');
+    if (campoAnalista && usuario.nome) {
+        campoAnalista.value = usuario.nome;
+        campoAnalista.readOnly = true;
+        campoAnalista.style.background = '#f5f5f5';
+        campoAnalista.style.color = '#546e7a';
+        campoAnalista.title = 'Preenchido automaticamente com o usuário logado';
+    }
 }
 
 // Verifica sessão salva ao carregar a página
@@ -1586,6 +1689,156 @@ async function carregarUsuarios() {
             '<tr><td colspan="6" style="color:#c62828;">Erro ao carregar.</td></tr>';
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  RECUPERAÇÃO DE SENHA
+// ═══════════════════════════════════════════════════════════════
+let _resetToken = null;
+
+function abrirRecuperarSenha() {
+    document.getElementById('login-screen').classList.add('oculto');
+    document.getElementById('reset-screen').classList.remove('oculto');
+    document.getElementById('reset-card-solicitar').classList.remove('oculto');
+    document.getElementById('reset-card-nova-senha').classList.add('oculto');
+    document.getElementById('reset_email').value = '';
+    document.getElementById('reset-msg-solicitar').textContent = '';
+    document.getElementById('reset-msg-solicitar').className = 'reset-msg';
+    setTimeout(() => document.getElementById('reset_email').focus(), 100);
+}
+
+function voltarParaLogin() {
+    document.getElementById('reset-screen').classList.add('oculto');
+    document.getElementById('login-screen').classList.remove('oculto');
+}
+
+async function solicitarReset() {
+    const email = document.getElementById('reset_email').value.trim();
+    const msg   = document.getElementById('reset-msg-solicitar');
+    const btn   = document.getElementById('btn-solicitar-reset');
+
+    msg.className = 'reset-msg';
+    msg.textContent = '';
+
+    if (!email) {
+        msg.className = 'reset-msg erro';
+        msg.textContent = 'Digite seu e-mail.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    try {
+        const r = await fetch(API_BASE + '/auth/solicitar-reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        const d = await r.json();
+        msg.className = 'reset-msg ok';
+        msg.textContent = '✅ ' + d.mensagem;
+        btn.disabled = true;
+        btn.textContent = 'E-mail enviado';
+    } catch(e) {
+        msg.className = 'reset-msg erro';
+        msg.textContent = 'Erro de conexão. Tente novamente.';
+        btn.disabled = false;
+        btn.textContent = 'Enviar link de recuperação';
+    }
+}
+
+async function confirmarRedefinicao() {
+    const nova     = document.getElementById('reset_senha_nova').value;
+    const confirma = document.getElementById('reset_senha_confirma').value;
+    const msg      = document.getElementById('reset-msg-nova');
+    const btn      = document.getElementById('btn-confirmar-reset');
+
+    msg.className = 'reset-msg';
+    msg.textContent = '';
+
+    if (!nova || !confirma) {
+        msg.className = 'reset-msg erro';
+        msg.textContent = 'Preencha os dois campos.';
+        return;
+    }
+    if (nova !== confirma) {
+        msg.className = 'reset-msg erro';
+        msg.textContent = 'As senhas não coincidem.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+
+    try {
+        const r = await fetch(API_BASE + '/auth/redefinir-senha', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: _resetToken, senha_nova: nova }),
+        });
+        const d = await r.json();
+        if (r.ok) {
+            msg.className = 'reset-msg ok';
+            msg.textContent = '✅ ' + d.mensagem;
+            btn.disabled = true;
+            btn.textContent = 'Senha salva';
+            setTimeout(() => {
+                _resetToken = null;
+                document.getElementById('reset-screen').classList.add('oculto');
+                document.getElementById('login-screen').classList.remove('oculto');
+                // Limpa o token da URL
+                window.history.replaceState({}, '', window.location.pathname);
+            }, 2500);
+        } else {
+            msg.className = 'reset-msg erro';
+            msg.textContent = d.erro || 'Erro ao redefinir senha.';
+            btn.disabled = false;
+            btn.textContent = 'Salvar nova senha';
+        }
+    } catch(e) {
+        msg.className = 'reset-msg erro';
+        msg.textContent = 'Erro de conexão.';
+        btn.disabled = false;
+        btn.textContent = 'Salvar nova senha';
+    }
+}
+
+// Verifica se há token de reset na URL ao carregar a página
+(function verificarTokenReset() {
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get('reset_token');
+    if (!token) return;
+
+    _resetToken = token;
+
+    // Valida o token com o servidor antes de mostrar o formulário
+    fetch(API_BASE + '/auth/validar-token-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.valido) {
+            document.getElementById('login-screen').classList.add('oculto');
+            document.getElementById('reset-screen').classList.remove('oculto');
+            document.getElementById('reset-card-solicitar').classList.add('oculto');
+            document.getElementById('reset-card-nova-senha').classList.remove('oculto');
+            if (d.nome) {
+                document.getElementById('reset-nova-boas-vindas').textContent =
+                    `Olá, ${d.nome}! Cadastre sua nova senha de acesso.`;
+            }
+        } else {
+            // Token inválido — mostra login com mensagem de erro
+            document.getElementById('login_erro').textContent =
+                '⚠️ Link de recuperação inválido ou expirado. Solicite um novo.';
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    })
+    .catch(() => {
+        window.history.replaceState({}, '', window.location.pathname);
+    });
+})();
 
 // ═══════════════════════════════════════════════════════════════
 //  TOGGLE MOSTRAR/OCULTAR SENHA
