@@ -74,6 +74,11 @@ SIGCAR_SENHA   = os.environ.get("SIGCAR_SENHA",   "")
 SIGAM_USUARIO  = os.environ.get("SIGAM_USUARIO",  "")
 SIGAM_SENHA    = os.environ.get("SIGAM_SENHA",    "")
 SIGAM_BASE     = "https://sigam.to.gov.br/proton"
+
+# Proxy local (computador dentro da rede NATURATINS)
+# Se definido, todas as requisições ao SIGAM passam pelo proxy
+SIGAM_PROXY_URL   = os.environ.get("SIGAM_PROXY_URL",   "")  # ex: http://192.168.1.100:5050
+SIGAM_PROXY_CHAVE = os.environ.get("SIGAM_PROXY_CHAVE", "naturatins-proxy-2026")
 SIGCAR_BASE    = "http://sigcar.semarh.to.gov.br"
 
 # E-mail via API HTTP do Brevo (não usa SMTP — funciona no Render gratuito)
@@ -1208,6 +1213,19 @@ def buscar_sigam():
 
         LogAcesso.registrar("busca_sigam", f"{ano}/{orgao}/{sequencial}", usuario.id)
         log.info("SIGAM: %s/%s/%s — por %s", ano, orgao, sequencial, usuario.email)
+
+        # ── Usa proxy local se configurado ──────────────────────────
+        if SIGAM_PROXY_URL:
+            log.info("SIGAM via proxy: %s", SIGAM_PROXY_URL)
+            r = req.post(
+                f"{SIGAM_PROXY_URL.rstrip('/')}/proxy/sigam",
+                headers={"X-Proxy-Chave": SIGAM_PROXY_CHAVE,
+                         "Content-Type": "application/json"},
+                json={"ano": ano, "orgao": orgao, "sequencial": sequencial},
+                timeout=60,
+            )
+            return jsonify(r.json())
+        # ── Acesso direto (requer IP liberado no SIGAM) ──────────────
 
         s = _sigam_session()
         proc = _sigam_buscar_processo(s, ano, orgao, sequencial)
