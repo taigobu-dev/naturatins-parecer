@@ -1222,7 +1222,7 @@ def buscar_sigam():
                 headers={"X-Proxy-Chave": SIGAM_PROXY_CHAVE,
                          "Content-Type": "application/json"},
                 json={"ano": ano, "orgao": orgao, "sequencial": sequencial},
-                timeout=60,
+                timeout=120,
             )
             return jsonify(r.json())
         # ── Acesso direto (requer IP liberado no SIGAM) ──────────────
