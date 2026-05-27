@@ -1500,6 +1500,9 @@ function gerarParecer(){
 `;
 
     document.getElementById('pdf-content').innerHTML = html;
+    // Oculta a barra do usuário antes de imprimir
+    const barra = document.getElementById('barra-usuario');
+    if (barra) barra.style.display = 'none';
     // Registra o parecer no banco para auditoria
     registrarParecer({
         numero_processo: numProcesso,
@@ -1510,6 +1513,8 @@ function gerarParecer(){
         conclusao: conclusao,
     });
     window.print();
+    // Restaura a barra do usuário após imprimir
+    if (barra) barra.style.display = '';
 }
 
 // ═══════════════════════════════════════════════════════════════
