@@ -1425,7 +1425,11 @@ Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JS
                     {"text": prompt}
                 ]
             }],
-            "generationConfig": {"maxOutputTokens": 500, "temperature": 0}
+            "generationConfig": {
+                "maxOutputTokens": 2048,
+                "temperature": 0,
+                "thinkingConfig": {"thinkingBudget": 0}
+            }
         }
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
@@ -1444,6 +1448,7 @@ Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JS
             return jsonify({"erro": "Limite da API atingido. Aguarde alguns segundos e tente novamente."}), 429
 
         texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        log.info("Gemini resposta bruta: %s", texto[:300])
         json_limpo = re.sub(r"```json|```", "", texto).strip()
         dados = _json.loads(json_limpo)
         LogAcesso.registrar("certidao_lida", "ok", g.usuario.id)
