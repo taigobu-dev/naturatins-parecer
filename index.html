@@ -1811,14 +1811,30 @@ async function lerCertidoes() {
     const resultados = [];
     for (let i = 0; i < arquivos.length; i++) {
         try {
-            const formData = new FormData();
-            formData.append('pdf', arquivos[i]);
-            const r = await fetch(API_BASE + '/api/ler-certidao', {
-                method: 'POST',
-                headers: Session.headers(false),
-                body: formData,
-            });
-            const d = await r.json();
+            let d, r;
+            // Tenta até 3 vezes com espera em caso de rate limit
+            for (let tentativa = 0; tentativa < 3; tentativa++) {
+                const formData = new FormData();
+                formData.append('pdf', arquivos[i]);
+                r = await fetch(API_BASE + '/api/ler-certidao', {
+                    method: 'POST',
+                    headers: Session.headers(false),
+                    body: formData,
+                });
+                d = await r.json();
+
+                if (r.status === 429 && d.erro === 'RATE_LIMIT') {
+                    const espera = 30 * (tentativa + 1);
+                    for (let s = espera; s > 0; s--) {
+                        document.getElementById(`cert-status-${i}`).textContent = `⏳ Aguardando ${s}s...`;
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                    document.getElementById(`cert-status-${i}`).textContent = '⏳ Lendo...';
+                    continue;
+                }
+                break;
+            }
+
             if (!r.ok || !d.sucesso) throw new Error(d.erro || 'Erro ao processar.');
 
             resultados.push(d);

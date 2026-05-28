@@ -1425,20 +1425,16 @@ Se algum dado não for encontrado use string vazia "". Responda APENAS com o JSO
     }
 
     try:
-        # Tenta até 4 vezes com backoff exponencial
-        for tentativa in range(4):
-            r = req.post(url, headers={"Content-Type": "application/json"},
-                         json=payload_gemini, timeout=60)
-            if r.status_code == 429:
-                espera = 20 * (2 ** tentativa)  # 20, 40, 80, 160s
-                log.warning("Gemini 429 — aguardando %ds (tentativa %d/4)", espera, tentativa + 1)
-                _time.sleep(espera)
-                continue
-            r.raise_for_status()
-            break
-        else:
-            return jsonify({"erro": "Limite da API atingido. Aguarde 1 minuto e tente novamente."}), 429
+        import json as _json
 
+        r = req.post(url, headers={"Content-Type": "application/json"},
+                     json=payload_gemini, timeout=30)
+
+        if r.status_code == 429:
+            log.warning("Gemini 429 — rate limit atingido")
+            return jsonify({"erro": "RATE_LIMIT"}), 429
+
+        r.raise_for_status()
         texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
         dados = _json.loads(re.sub(r"```json|```", "", texto).strip())
         LogAcesso.registrar("certidao_lida", "ok", g.usuario.id)
