@@ -2388,7 +2388,7 @@ async function consultarCARBackend() {
             st.innerText='✅ Dados do CAR recuperados!';
             const p=(id,val)=>{ const c=document.getElementById(id); if(c) c.value=val??''; };
             p('status_car_input',d.status_car); p('q2',d.municipio||'');
-            p('nome_imovel',d.denominacao_imovel||''); p('data_sigcar',d.data_sigcar||'');
+            p('nome_imovel', d.nome_imovel || d.denominacao_imovel || ''); p('data_sigcar',d.data_sigcar||'');
             p('nome_requerente',d.nome_requerente); p('cpf_requerente',d.cpf_requerente);
             p('area_escriturada',d.area_escriturada); p('area_vetorizada',d.area_vetorizada);
             p('area_liquida',d.area_liquida); p('area_remanescente',d.remanescente);
