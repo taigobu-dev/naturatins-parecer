@@ -1368,11 +1368,22 @@ def _inicializar_banco():
 # ═══════════════════════════════════════════════════════════════════
 
 @app.route("/api/ler-certidao", methods=["POST", "OPTIONS"])
-@requer_login
-@limiter.limit("60 per hour")
 def ler_certidao():
     if request.method == "OPTIONS":
         return jsonify({"status": "ok"}), 200
+
+    # Autenticação manual para não bloquear OPTIONS
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not token:
+        return jsonify({"erro": "Não autenticado."}), 401
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        usuario = db.session.get(Usuario, payload.get("sub"))
+        if not usuario or not usuario.ativo:
+            return jsonify({"erro": "Sessão inválida."}), 401
+        g.usuario = usuario
+    except Exception:
+        return jsonify({"erro": "Token inválido."}), 401
 
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
     if not GEMINI_API_KEY:
