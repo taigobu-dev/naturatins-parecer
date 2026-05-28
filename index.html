@@ -1834,8 +1834,14 @@ async function lerCertidoes() {
             document.getElementById(`cert-dados-${i}`).innerHTML =
                 `<span style="color:#c62828;grid-column:1/-1;">${e.message}</span>`;
         }
-        // Pequena pausa entre arquivos para não sobrecarregar o servidor
-        if (i < arquivos.length - 1) await new Promise(r => setTimeout(r, 500));
+        // Aguarda 7s entre certidões (limite Gemini free: ~8 req/min)
+        if (i < arquivos.length - 1) {
+            for (let s = 7; s > 0; s--) {
+                status.innerHTML = `<span style="color:#607d8b;">⏳ ${i+1}/${arquivos.length} lidas — próxima em ${s}s...</span>`;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            status.innerHTML = `<span style="color:#607d8b;">⏳ Lendo certidão ${i+2}/${arquivos.length}...</span>`;
+        }
     }
 
     // Consolida os resultados nos campos do formulário
