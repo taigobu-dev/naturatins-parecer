@@ -173,6 +173,24 @@
         }
         .btn-olho:hover { color: #37474f; }
 
+        /* ══ CARDS DE CERTIDÃO ═══════════════════════════════════ */
+        .cert-card {
+            background: #f8fffe; border: 1px solid #b2dfdb; border-radius: 8px;
+            padding: 12px 14px; font-size: 13px;
+        }
+        .cert-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px;
+        }
+        .cert-card-nome { font-weight: 700; color: #00695c; font-size: 13px; }
+        .cert-card-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+        .cert-card-status.ok  { background: #e8f5e9; color: #2e7d32; }
+        .cert-card-status.err { background: #ffebee; color: #c62828; }
+        .cert-card-status.lendo { background: #e3f2fd; color: #1565c0; }
+        .cert-card-dados { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; color: #546e7a; }
+        .cert-card-dados span { font-size: 12px; }
+        .cert-card-dados strong { color: #37474f; }
+
         /* ══ TELA RECUPERAÇÃO DE SENHA ══════════════════════════════ */
         #reset-screen {
             position: fixed; inset: 0; z-index: 9998;
@@ -604,23 +622,33 @@
 
     <!-- CERTIDÃO DE INTEIRO TEOR -->
     <div class="search-box-sigam" style="margin-bottom:16px;">
-        <label>📄 Certidão de Inteiro Teor (PDF):</label>
+        <label>📄 Certidão(ões) de Inteiro Teor (PDF) — pode selecionar várias:</label>
         <div class="search-row" style="margin-top:8px;align-items:center;flex-wrap:wrap;gap:8px;">
-            <input type="file" id="certidao_pdf" accept=".pdf"
+            <input type="file" id="certidao_pdf" accept=".pdf" multiple
                    style="flex:1;min-width:200px;padding:7px;border:1.5px solid #b0bec5;border-radius:6px;font-size:13px;">
-            <button class="btn-search-sigam" onclick="lerCertidao()" id="btn-ler-certidao">
-                🔍 Ler Certidão
+            <button class="btn-search-sigam" onclick="lerCertidoes()" id="btn-ler-certidao">
+                🔍 Ler Certidão(ões)
             </button>
         </div>
-        <small id="status_certidao" style="color:#00838f;"></small>
+        <div id="status_certidao" style="margin-top:6px;"></div>
     </div>
+
+    <!-- Resultados das certidões lidas -->
+    <div id="certidoes-resultado" style="margin-bottom:16px;display:none;">
+        <div style="font-size:13px;font-weight:700;color:#37474f;margin-bottom:8px;">
+            📋 Dados extraídos das certidões:
+        </div>
+        <div id="certidoes-lista" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <!-- Campos consolidados (preenchidos automaticamente ou editáveis) -->
     <div class="grid-2" style="margin-bottom:16px;">
         <div class="form-group">
             <label>Nº da(s) Matrícula(s):</label>
             <input type="text" id="cert_matricula" placeholder="Preenchido automaticamente...">
         </div>
         <div class="form-group">
-            <label>Área da Matrícula (ha):</label>
+            <label>Área Total da(s) Matrícula(s) (ha):</label>
             <input type="text" id="cert_area" placeholder="Preenchido automaticamente...">
         </div>
         <div class="form-group">
@@ -1746,57 +1774,110 @@ async function carregarUsuarios() {
 // ═══════════════════════════════════════════════════════════════
 //  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA IA
 // ═══════════════════════════════════════════════════════════════
-async function lerCertidao() {
-    const input = document.getElementById('certidao_pdf');
+// ═══════════════════════════════════════════════════════════════
+//  LEITURA DE CERTIDÃO(ÕES) DE INTEIRO TEOR VIA IA
+// ═══════════════════════════════════════════════════════════════
+async function lerCertidoes() {
+    const input  = document.getElementById('certidao_pdf');
     const status = document.getElementById('status_certidao');
-    const btn = document.getElementById('btn-ler-certidao');
+    const btn    = document.getElementById('btn-ler-certidao');
+    const lista  = document.getElementById('certidoes-lista');
+    const bloco  = document.getElementById('certidoes-resultado');
 
-    if (!input.files || !input.files[0]) {
-        status.style.color = '#c62828';
-        status.textContent = '⚠️ Selecione um arquivo PDF primeiro.';
+    if (!input.files || !input.files.length) {
+        status.innerHTML = '<span style="color:#c62828;">⚠️ Selecione ao menos um arquivo PDF.</span>';
         return;
     }
 
+    const arquivos = Array.from(input.files);
     btn.disabled = true;
     btn.textContent = '⏳ Lendo...';
-    status.style.color = '#00838f';
-    status.textContent = 'Analisando certidão com IA...';
+    status.innerHTML = '';
+    lista.innerHTML = '';
+    bloco.style.display = 'block';
 
-    try {
-        const formData = new FormData();
-        formData.append('pdf', input.files[0]);
+    // Cria um card para cada arquivo
+    const cards = arquivos.map((f, i) => {
+        const card = document.createElement('div');
+        card.className = 'cert-card';
+        card.id = `cert-card-${i}`;
+        card.innerHTML = `
+            <div class="cert-card-header">
+                <span class="cert-card-nome">📄 ${f.name}</span>
+                <span class="cert-card-status lendo" id="cert-status-${i}">⏳ Lendo...</span>
+            </div>
+            <div class="cert-card-dados" id="cert-dados-${i}"></div>`;
+        lista.appendChild(card);
+        return card;
+    });
 
-        const r = await fetch(API_BASE + '/api/ler-certidao', {
-            method: 'POST',
-            headers: Session.headers(false), // sem Content-Type para multipart
-            body: formData,
+    // Processa cada arquivo (em paralelo)
+    const resultados = [];
+    await Promise.all(arquivos.map(async (arquivo, i) => {
+        try {
+            const formData = new FormData();
+            formData.append('pdf', arquivo);
+            const r = await fetch(API_BASE + '/api/ler-certidao', {
+                method: 'POST',
+                headers: Session.headers(false),
+                body: formData,
+            });
+            const d = await r.json();
+            if (!r.ok || !d.sucesso) throw new Error(d.erro || 'Erro ao processar.');
+
+            resultados.push(d);
+            document.getElementById(`cert-status-${i}`).className = 'cert-card-status ok';
+            document.getElementById(`cert-status-${i}`).textContent = '✅ Lido';
+            document.getElementById(`cert-dados-${i}`).innerHTML = `
+                <span><strong>Matrícula:</strong> ${d.matriculas || '–'}</span>
+                <span><strong>Área:</strong> ${d.area_ha || '–'}</span>
+                <span><strong>Proprietário:</strong> ${d.ultimo_proprietario || '–'}</span>
+                <span><strong>Averbação RL:</strong> ${d.averbacao_reserva_legal || '–'}</span>`;
+        } catch(e) {
+            document.getElementById(`cert-status-${i}`).className = 'cert-card-status err';
+            document.getElementById(`cert-status-${i}`).textContent = '❌ Erro';
+            document.getElementById(`cert-dados-${i}`).innerHTML =
+                `<span style="color:#c62828;grid-column:1/-1;">${e.message}</span>`;
+        }
+    }));
+
+    // Consolida os resultados nos campos do formulário
+    if (resultados.length > 0) {
+        // Matrículas: junta todas
+        const matriculas = resultados
+            .map(d => d.matriculas).filter(Boolean).join(', ');
+        if (matriculas) document.getElementById('cert_matricula').value = matriculas;
+
+        // Área: soma todas as áreas numéricas
+        const areas = resultados.map(d => {
+            const m = (d.area_ha || '').replace(',', '.').match(/[\d.]+/);
+            return m ? parseFloat(m[0]) : 0;
         });
-        const d = await r.json();
-
-        if (!r.ok || !d.sucesso) {
-            throw new Error(d.erro || 'Erro ao processar PDF.');
+        const areaTotal = areas.reduce((a, b) => a + b, 0);
+        if (areaTotal > 0) {
+            document.getElementById('cert_area').value =
+                areaTotal.toLocaleString('pt-BR', {minimumFractionDigits:4, maximumFractionDigits:4}) + ' ha';
         }
 
-        if (d.matriculas)          document.getElementById('cert_matricula').value = d.matriculas;
-        if (d.area_ha)             document.getElementById('cert_area').value = d.area_ha;
-        if (d.ultimo_proprietario) document.getElementById('cert_proprietario').value = d.ultimo_proprietario;
-        if (d.averbacao_reserva_legal) {
-            const sel = document.getElementById('cert_averbacao_rl');
-            const val = d.averbacao_reserva_legal.trim();
-            if (val === 'Sim') sel.value = 'Sim';
-            else if (val === 'Não' || val === 'Nao') sel.value = 'Não';
-        }
+        // Proprietário: usa o do último arquivo lido com sucesso
+        const ultimoComProprietario = [...resultados].reverse().find(d => d.ultimo_proprietario);
+        if (ultimoComProprietario)
+            document.getElementById('cert_proprietario').value = ultimoComProprietario.ultimo_proprietario;
 
-        status.style.color = '#2e7d32';
-        status.textContent = '✅ Certidão lida com sucesso!';
-
-    } catch (e) {
-        status.style.color = '#c62828';
-        status.textContent = '❌ ' + e.message;
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '🔍 Ler Certidão';
+        // Averbação RL: "Sim" se qualquer uma tiver, "Não" se nenhuma tiver
+        const temAverbacao = resultados.some(d => d.averbacao_reserva_legal === 'Sim');
+        const semAverbacao = resultados.every(d => d.averbacao_reserva_legal === 'Não');
+        const sel = document.getElementById('cert_averbacao_rl');
+        if (temAverbacao) sel.value = 'Sim';
+        else if (semAverbacao) sel.value = 'Não';
     }
+
+    const ok  = resultados.length;
+    const err = arquivos.length - ok;
+    status.innerHTML = `<span style="color:#2e7d32;">✅ ${ok} certidão(ões) lida(s) com sucesso${err > 0 ? ` · <span style="color:#c62828;">❌ ${err} com erro</span>` : ''}.</span>`;
+
+    btn.disabled = false;
+    btn.textContent = '🔍 Ler Certidão(ões)';
 }
 
 // ═══════════════════════════════════════════════════════════════
