@@ -1491,6 +1491,7 @@ def ler_certidao():
         if not texto.strip():
             return jsonify({"erro": "Não foi possível extrair texto do PDF. Verifique se não é uma imagem escaneada."}), 400
 
+        log.info("Texto extraído da certidão (primeiros 1000 chars):\n%s", texto[:1000])
         dados = _parsear_certidao(texto)
         LogAcesso.registrar("certidao_lida", "ok", g.usuario.id)
         return jsonify({"sucesso": True, **dados})
