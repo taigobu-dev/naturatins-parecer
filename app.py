@@ -1427,7 +1427,7 @@ Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JS
             }],
             "generationConfig": {"maxOutputTokens": 500, "temperature": 0}
         }
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
         # Tenta até 3 vezes com backoff em caso de 429
         for tentativa in range(3):
