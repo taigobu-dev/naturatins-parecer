@@ -1360,7 +1360,7 @@ def _inicializar_banco():
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA GEMINI API
+#  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA CLAUDE HAIKU
 # ═══════════════════════════════════════════════════════════════════
 
 @app.route("/api/ler-certidao", methods=["POST", "OPTIONS"])
@@ -1412,26 +1412,28 @@ def ler_certidao():
 }
 Se algum dado não for encontrado use string vazia "". Responda APENAS com o JSON."""
 
-    import json as _json, time as _time
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-    payload_gemini = {
-        "contents": [{"parts": [
-            {"inline_data": {"mime_type": "application/pdf", "data": pdf_b64}},
-            {"text": prompt}
-        ]}],
-        "generationConfig": {"maxOutputTokens": 512, "temperature": 0,
-                             "thinkingConfig": {"thinkingBudget": 0}}
-    }
-
     try:
         import json as _json
 
-        r = req.post(url, headers={"Content-Type": "application/json"},
-                     json=payload_gemini, timeout=30)
+        r = req.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}",
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [{"parts": [
+                    {"inline_data": {"mime_type": "application/pdf", "data": pdf_b64}},
+                    {"text": prompt}
+                ]}],
+                "generationConfig": {
+                    "maxOutputTokens": 512,
+                    "temperature": 0,
+                    "thinkingConfig": {"thinkingBudget": 0}
+                }
+            },
+            timeout=60,
+        )
 
         if r.status_code == 429:
-            log.warning("Gemini 429 — rate limit atingido")
+            log.warning("Gemini 429 — rate limit")
             return jsonify({"erro": "RATE_LIMIT"}), 429
 
         r.raise_for_status()
