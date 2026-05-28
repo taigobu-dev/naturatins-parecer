@@ -1869,13 +1869,28 @@ async function lerCertidoes() {
         // Área: mostra cada área + soma total quando possível
         const areasTexto = resultados.map(d => d.area_ha).filter(Boolean);
         if (areasTexto.length > 0) {
-            // Tenta extrair valores numéricos (suporta 178,4343 e 48.40.00 etc)
-            const areasSoma = areasTexto.map(txt => {
+            function parsearArea(txt) {
                 const s = txt.replace(/\s*ha\s*/i, '').trim();
-                // Remove pontos de milhar, troca vírgula por ponto
+                // Formato antigo de cartório: HH.AA.CC (hectares.ares.centiares)
+                // ex: 48.40.00 → 48 + 40/100 + 00/10000 = 48,4000
+                const mHAC = s.match(/^(\d+)\.(\d{2})\.(\d{2})$/);
+                if (mHAC) {
+                    const ha = parseInt(mHAC[1]);
+                    const ar = parseInt(mHAC[2]) / 100;
+                    const ca = parseInt(mHAC[3]) / 10000;
+                    return ha + ar + ca;
+                }
+                // Formato HH.AA (sem centiares)
+                const mHA = s.match(/^(\d+)\.(\d{2})$/);
+                if (mHA) {
+                    return parseInt(mHA[1]) + parseInt(mHA[2]) / 100;
+                }
+                // Formato brasileiro normal: 178,4343
                 const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
                 return isNaN(n) ? null : n;
-            });
+            }
+
+            const areasSoma = areasTexto.map(txt => parsearArea(txt));
             const todasOk = areasSoma.every(v => v !== null);
             if (todasOk && areasTexto.length > 1) {
                 const total = areasSoma.reduce((a, b) => a + b, 0);
