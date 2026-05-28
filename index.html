@@ -1871,23 +1871,30 @@ async function lerCertidoes() {
         if (areasTexto.length > 0) {
             function parsearArea(txt) {
                 const s = txt.replace(/\s*ha\s*/i, '').trim();
-                // Formato antigo de cartório: HH.AA.CC (hectares.ares.centiares)
-                // ex: 48.40.00 → 48 + 40/100 + 00/10000 = 48,4000
+
+                // Formato HH.AA.CC (ex: 48.40.00)
                 const mHAC = s.match(/^(\d+)\.(\d{2})\.(\d{2})$/);
                 if (mHAC) {
-                    const ha = parseInt(mHAC[1]);
-                    const ar = parseInt(mHAC[2]) / 100;
-                    const ca = parseInt(mHAC[3]) / 10000;
-                    return ha + ar + ca;
+                    return parseInt(mHAC[1]) + parseInt(mHAC[2]) / 100 + parseInt(mHAC[3]) / 10000;
                 }
-                // Formato HH.AA (sem centiares)
+
+                // Formato HH.AA,CC (ex: 38.72,00)
+                const mHAC2 = s.match(/^(\d+)\.(\d{2}),(\d{2})$/);
+                if (mHAC2) {
+                    return parseInt(mHAC2[1]) + parseInt(mHAC2[2]) / 100 + parseInt(mHAC2[3]) / 10000;
+                }
+
+                // Formato HH.AA (ex: 48.40)
                 const mHA = s.match(/^(\d+)\.(\d{2})$/);
                 if (mHA) {
                     return parseInt(mHA[1]) + parseInt(mHA[2]) / 100;
                 }
-                // Formato brasileiro normal: 178,4343
-                const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
-                return isNaN(n) ? null : n;
+
+                // Formato brasileiro: 178,4343 ou 1.234,5678
+                const brasileiro = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+                if (!isNaN(brasileiro)) return brasileiro;
+
+                return null;
             }
 
             const areasSoma = areasTexto.map(txt => parsearArea(txt));
