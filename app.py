@@ -1405,7 +1405,7 @@ def ler_certidao():
 
     prompt = """Analise esta certidão de inteiro teor de imóvel rural e extraia APENAS as seguintes informações em JSON puro (sem markdown, sem backticks):
 {
-  "matriculas": "número(s) da matrícula separados por vírgula, ex: 1234 ou 1234, 5678",
+  "matriculas": "APENAS o número da matrícula principal do imóvel, que aparece no cabeçalho da certidão ao lado de 'Nr. da Matrícula' ou 'MATRÍCULA Nº'. NÃO inclua número de ficha, folha ou livro. Ex: 5882 ou 09 ou 4942",
   "area_ha": "área total em hectares EXATAMENTE como aparece no documento, sem converter, ex: 178,4343 ha ou 48.40.00 ha ou 38.72,00 ha",
   "averbacao_reserva_legal": "Sim ou Não — se há averbação de reserva legal registrada no documento",
   "area_reserva_legal_averbada": "área da reserva legal averbada como aparece no documento. Se não houver averbação use string vazia"
