@@ -1850,8 +1850,13 @@ async function lerCertidoes() {
             document.getElementById(`cert-dados-${i}`).innerHTML =
                 `<span style="color:#c62828;grid-column:1/-1;">${e.message}</span>`;
         }
-        // Pequena pausa entre arquivos
-        if (i < arquivos.length - 1) await new Promise(r => setTimeout(r, 1000));
+        // 5s entre certidões (Flash-Lite: 15 RPM)
+        if (i < arquivos.length - 1) {
+            for (let s = 5; s > 0; s--) {
+                status.innerHTML = `<span style="color:#607d8b;">⏳ ${i+1}/${arquivos.length} lidas — próxima em ${s}s...</span>`;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
     }
 
     // Consolida os resultados nos campos do formulário
