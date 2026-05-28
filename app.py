@@ -4,7 +4,7 @@ API Flask com autenticação JWT, banco PostgreSQL e segurança profissional.
 Deploy: Render.com — SEM Selenium, usa requests puro.
 """
 
-import os, re, time, logging, secrets
+import os, re, time, logging, secrets, base64
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -85,6 +85,9 @@ SIGCAR_BASE    = "http://sigcar.semarh.to.gov.br"
 BREVO_API_KEY   = os.environ.get("BREVO_API_KEY",  "")
 EMAIL_REMETENTE = os.environ.get("EMAIL_REMETENTE", "")
 FRONTEND_URL    = os.environ.get("FRONTEND_URL",    "https://taigobu-dev.github.io/naturatins-parecer")
+
+# Anthropic Claude API — leitura de certidões
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
 
@@ -1354,6 +1357,85 @@ def _inicializar_banco():
             log.warning("=" * 60)
         else:
             log.info("Admin inicial criado: %s", ADMIN_EMAIL)
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA CLAUDE API
+# ═══════════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════════
+#  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA GEMINI API (GRATUITO)
+# ═══════════════════════════════════════════════════════════════════
+
+@app.route("/api/ler-certidao", methods=["POST", "OPTIONS"])
+@requer_login
+@limiter.limit("60 per hour")
+def ler_certidao():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+    if not GEMINI_API_KEY:
+        return jsonify({"erro": "API de IA não configurada. Configure GEMINI_API_KEY no Render."}), 503
+
+    pdf_bytes = None
+    if request.files.get("pdf"):
+        pdf_bytes = request.files["pdf"].read()
+    elif request.is_json:
+        b64 = request.json.get("pdf_base64", "")
+        if b64:
+            try:
+                pdf_bytes = base64.b64decode(b64)
+            except Exception:
+                return jsonify({"erro": "Base64 inválido."}), 400
+
+    if not pdf_bytes:
+        return jsonify({"erro": "Nenhum PDF enviado."}), 400
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        return jsonify({"erro": "PDF muito grande (máx. 10 MB)."}), 400
+
+    pdf_b64 = base64.b64encode(pdf_bytes).decode()
+
+    prompt = """Analise esta certidão de inteiro teor de imóvel rural e extraia APENAS as seguintes informações em JSON puro (sem markdown, sem backticks):
+{
+  "matriculas": "número(s) da matrícula separados por vírgula, ex: 1234 ou 1234, 5678",
+  "area_ha": "área total em hectares como aparece no documento, ex: 117,1787 ha",
+  "ultimo_proprietario": "nome completo do último proprietário/adquirente atual",
+  "averbacao_reserva_legal": "Sim ou Não — se há averbação de reserva legal registrada no documento"
+}
+Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JSON."""
+
+    try:
+        import json as _json
+        r = req.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [{
+                    "parts": [
+                        {
+                            "inline_data": {
+                                "mime_type": "application/pdf",
+                                "data": pdf_b64,
+                            }
+                        },
+                        {"text": prompt}
+                    ]
+                }],
+                "generationConfig": {"maxOutputTokens": 500, "temperature": 0}
+            },
+            timeout=60,
+        )
+        r.raise_for_status()
+        texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        json_limpo = re.sub(r"```json|```", "", texto).strip()
+        dados = _json.loads(json_limpo)
+        LogAcesso.registrar("certidao_lida", "ok", g.usuario.id)
+        return jsonify({"sucesso": True, **dados})
+
+    except Exception as exc:
+        log.error("Erro ao ler certidão: %s", exc)
+        return jsonify({"erro": f"Erro ao processar PDF: {exc}"}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════

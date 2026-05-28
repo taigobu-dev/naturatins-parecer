@@ -498,7 +498,7 @@
 
     <div class="admin-tabs">
       <button class="admin-tab ativo" onclick="abaAdmin('usuarios')">👥 Usuários</button>
-      <button class="admin-tab" onclick="abaAdmin('criar')">➕ Novo Usuário</button>
+      <button class="admin-tab" id="tab-criar-usuario" onclick="abaAdmin('criar')">➕ Novo Usuário</button>
       <button class="admin-tab" onclick="abaAdmin('logs')">📋 Logs</button>
       <button class="admin-tab" onclick="abaAdmin('pareceres')">📄 Pareceres</button>
     </div>
@@ -601,6 +601,42 @@
     </div>
 
     <h2>Dados do Imóvel – CAR / SIGCAR</h2>
+
+    <!-- CERTIDÃO DE INTEIRO TEOR -->
+    <div class="search-box-sigam" style="margin-bottom:16px;">
+        <label>📄 Certidão de Inteiro Teor (PDF):</label>
+        <div class="search-row" style="margin-top:8px;align-items:center;flex-wrap:wrap;gap:8px;">
+            <input type="file" id="certidao_pdf" accept=".pdf"
+                   style="flex:1;min-width:200px;padding:7px;border:1.5px solid #b0bec5;border-radius:6px;font-size:13px;">
+            <button class="btn-search-sigam" onclick="lerCertidao()" id="btn-ler-certidao">
+                🔍 Ler Certidão
+            </button>
+        </div>
+        <small id="status_certidao" style="color:#00838f;"></small>
+    </div>
+    <div class="grid-2" style="margin-bottom:16px;">
+        <div class="form-group">
+            <label>Nº da(s) Matrícula(s):</label>
+            <input type="text" id="cert_matricula" placeholder="Preenchido automaticamente...">
+        </div>
+        <div class="form-group">
+            <label>Área da Matrícula (ha):</label>
+            <input type="text" id="cert_area" placeholder="Preenchido automaticamente...">
+        </div>
+        <div class="form-group">
+            <label>Último Proprietário:</label>
+            <input type="text" id="cert_proprietario" placeholder="Preenchido automaticamente...">
+        </div>
+        <div class="form-group">
+            <label>Averbação de Reserva Legal:</label>
+            <select id="cert_averbacao_rl">
+                <option value="">Não verificado</option>
+                <option value="Sim">Sim — possui averbação</option>
+                <option value="Não">Não — sem averbação</option>
+            </select>
+        </div>
+    </div>
+
     <div class="search-box">
         <label>🔍 Número do CAR para busca automática (SIGCAR):</label>
         <div class="search-row" style="margin-top:8px;">
@@ -1543,11 +1579,10 @@ const Session = {
         localStorage.removeItem('nt_token');
         localStorage.removeItem('nt_usuario');
     },
-    headers() {
-        return {
-            'Content-Type':  'application/json',
-            'Authorization': 'Bearer ' + (this.token || ''),
-        };
+    headers(comContentType = true) {
+        const h = { 'Authorization': 'Bearer ' + (this.token || '') };
+        if (comContentType) h['Content-Type'] = 'application/json';
+        return h;
     },
 };
 
@@ -1655,6 +1690,10 @@ function ativarSistema(usuario) {
 // ═══════════════════════════════════════════════════════════════
 function abrirAdmin() {
     document.getElementById('painel-admin').classList.remove('oculto');
+    // Oculta aba "Novo Usuário" para não-admins
+    const ehAdmin = Session.usuario && Session.usuario.perfil === 'admin';
+    const tabCriar = document.getElementById('tab-criar-usuario');
+    if (tabCriar) tabCriar.style.display = ehAdmin ? '' : 'none';
     carregarUsuarios();
 }
 function fecharAdmin() {
@@ -1676,6 +1715,7 @@ async function carregarUsuarios() {
         const d = await r.json();
         const tb = document.getElementById('admin-lista-usuarios');
         if (!d.usuarios || !d.usuarios.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#90a4ae;padding:12px;">Nenhum usuário.</td></tr>'; return; }
+        const ehAdmin = Session.usuario && Session.usuario.perfil === 'admin';
         tb.innerHTML = d.usuarios.map(u => `
             <tr>
               <td>${u.nome}</td>
@@ -1687,11 +1727,11 @@ async function carregarUsuarios() {
               </td>
               <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '–'}</td>
               <td style="white-space:nowrap;display:flex;gap:4px;flex-wrap:wrap;">
-                <button onclick="toggleUsuario(${u.id}, ${u.ativo})"
+                ${ehAdmin ? `<button onclick="toggleUsuario(${u.id}, ${u.ativo})"
                   style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #b0bec5;cursor:pointer;background:white;">
                   ${u.ativo ? 'Desativar' : 'Ativar'}
-                </button>
-                ${u.bloqueado ? `<button onclick="desbloquearUsuario(${u.id})"
+                </button>` : ''}
+                ${ehAdmin && u.bloqueado ? `<button onclick="desbloquearUsuario(${u.id})"
                   style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #e65100;cursor:pointer;background:#fff3e0;color:#e65100;font-weight:700;">
                   🔓 Desbloquear
                 </button>` : ''}
@@ -1700,6 +1740,62 @@ async function carregarUsuarios() {
     } catch(e) {
         document.getElementById('admin-lista-usuarios').innerHTML =
             '<tr><td colspan="6" style="color:#c62828;">Erro ao carregar.</td></tr>';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA IA
+// ═══════════════════════════════════════════════════════════════
+async function lerCertidao() {
+    const input = document.getElementById('certidao_pdf');
+    const status = document.getElementById('status_certidao');
+    const btn = document.getElementById('btn-ler-certidao');
+
+    if (!input.files || !input.files[0]) {
+        status.style.color = '#c62828';
+        status.textContent = '⚠️ Selecione um arquivo PDF primeiro.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Lendo...';
+    status.style.color = '#00838f';
+    status.textContent = 'Analisando certidão com IA...';
+
+    try {
+        const formData = new FormData();
+        formData.append('pdf', input.files[0]);
+
+        const r = await fetch(API_BASE + '/api/ler-certidao', {
+            method: 'POST',
+            headers: Session.headers(false), // sem Content-Type para multipart
+            body: formData,
+        });
+        const d = await r.json();
+
+        if (!r.ok || !d.sucesso) {
+            throw new Error(d.erro || 'Erro ao processar PDF.');
+        }
+
+        if (d.matriculas)          document.getElementById('cert_matricula').value = d.matriculas;
+        if (d.area_ha)             document.getElementById('cert_area').value = d.area_ha;
+        if (d.ultimo_proprietario) document.getElementById('cert_proprietario').value = d.ultimo_proprietario;
+        if (d.averbacao_reserva_legal) {
+            const sel = document.getElementById('cert_averbacao_rl');
+            const val = d.averbacao_reserva_legal.trim();
+            if (val === 'Sim') sel.value = 'Sim';
+            else if (val === 'Não' || val === 'Nao') sel.value = 'Não';
+        }
+
+        status.style.color = '#2e7d32';
+        status.textContent = '✅ Certidão lida com sucesso!';
+
+    } catch (e) {
+        status.style.color = '#c62828';
+        status.textContent = '❌ ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 Ler Certidão';
     }
 }
 
