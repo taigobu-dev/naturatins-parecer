@@ -1360,12 +1360,97 @@ def _inicializar_banco():
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA CLAUDE API
+#  LEITURA DE CERTIDÃO DE INTEIRO TEOR — EXTRAÇÃO LOCAL (pdfminer + regex)
 # ═══════════════════════════════════════════════════════════════════
 
-# ═══════════════════════════════════════════════════════════════════
-#  LEITURA DE CERTIDÃO DE INTEIRO TEOR VIA GEMINI API (GRATUITO)
-# ═══════════════════════════════════════════════════════════════════
+def _extrair_texto_certidao(pdf_bytes: bytes) -> str:
+    """Extrai texto de PDF usando pdfminer."""
+    try:
+        from pdfminer.high_level import extract_text
+        from pdfminer.layout import LAParams
+        import io
+        texto = extract_text(io.BytesIO(pdf_bytes), laparams=LAParams(line_margin=0.5))
+        return texto or ""
+    except Exception as e:
+        log.warning("pdfminer falhou: %s", e)
+        return ""
+
+
+def _parsear_certidao(texto: str) -> dict:
+    """Extrai dados da certidão usando regex."""
+    t = texto.upper()
+    resultado = {
+        "matriculas": "",
+        "area_ha": "",
+        "averbacao_reserva_legal": "",
+        "area_reserva_legal_averbada": "",
+    }
+
+    # ── Matrícula ────────────────────────────────────────────────
+    # Padrões: "MATRÍCULA Nº 1234", "MATRICULA: 1234", "M-1234", "FICHA REAL Nº 1234"
+    for padrao in [
+        r"MATR[IÍ]CULA\s*N[ºO°]?\s*[:\-]?\s*(\d+)",
+        r"\bM[-–]\s*(\d+)\b",
+        r"FICHA\s+REAL\s*N[ºO°]?\s*[:\-]?\s*(\d+)",
+        r"N[ºO°]\s+(?:DA\s+)?MATR[IÍ]CULA\s*[:\-]?\s*(\d+)",
+        r"IMÓVEL\s+(?:RURAL\s+)?(?:DE\s+)?N[ºO°]\s*(\d+)",
+    ]:
+        m = re.search(padrao, t)
+        if m:
+            resultado["matriculas"] = m.group(1)
+            break
+
+    # ── Área ─────────────────────────────────────────────────────
+    # Padrões: "ÁREA DE X,XXXX ha", "X,XXXX hectares", "COM A ÁREA DE X ha"
+    for padrao in [
+        r"[ÁA]REA\s+(?:TOTAL\s+)?(?:DE\s+)?(\d[\d.,]+)\s*(?:HA|HECTARES?)\b",
+        r"SUPERF[IÍ]CIE\s+(?:DE\s+)?(\d[\d.,]+)\s*(?:HA|HECTARES?)\b",
+        r"COM\s+(?:A\s+)?[ÁA]REA\s+(?:DE\s+)?(\d[\d.,]+)\s*(?:HA|HECTARES?)\b",
+        r"(\d[\d.,]+)\s*(?:HA|HECTARES?)\s*(?:,|\.|\s)\s*(?:CONFORME|SENDO|MEDINDO|DESMEMBRAD)",
+        r"MEDINDO\s+(?:A\s+[ÁA]REA\s+(?:DE\s+)?)?(\d[\d.,]+)\s*(?:HA|HECTARES?)\b",
+    ]:
+        m = re.search(padrao, t)
+        if m:
+            area_raw = m.group(1).strip()
+            # Formata: se tem vírgula decimal, mantém; converte ponto milhar
+            resultado["area_ha"] = area_raw + " ha"
+            break
+
+    # ── Averbação de Reserva Legal ────────────────────────────────
+    # Positivo: menciona averbação de RL
+    padroes_sim = [
+        r"AVERBA[ÇC][ÃA]O\s+(?:DE\s+)?RESERVA\s+LEGAL",
+        r"RESERVA\s+LEGAL\s+(?:FOI\s+)?AVERBAD",
+        r"AV\.\s*RESERVA\s+LEGAL",
+        r"AVERBAD[OA]\s+(?:A\s+)?RESERVA\s+LEGAL",
+    ]
+    padroes_nao = [
+        r"N[ÃA]O\s+(?:H[ÁA]\s+)?(?:NENHUMA\s+)?AVERBA[ÇC][ÃA]O",
+        r"SEM\s+AVERBA[ÇC][ÃA]O",
+        r"N[ÃA]O\s+CONSTA\s+AVERBA[ÇC][ÃA]O",
+    ]
+
+    tem_rl = any(re.search(p, t) for p in padroes_sim)
+    sem_rl = any(re.search(p, t) for p in padroes_nao)
+
+    if tem_rl and not sem_rl:
+        resultado["averbacao_reserva_legal"] = "Sim"
+        # Tenta extrair a área da RL averbada
+        for padrao in [
+            r"RESERVA\s+LEGAL\s+(?:AVERBAD[OA]\s+)?(?:DE\s+)?(?:ÁREA\s+(?:DE\s+)?)?(\d[\d.,]+)\s*(?:HA|HECTARES?)",
+            r"AVERBA[ÇC][ÃA]O\s+(?:DE\s+)?RESERVA\s+LEGAL\s+(?:DE\s+)?(\d[\d.,]+)\s*(?:HA|HECTARES?)",
+            r"(\d[\d.,]+)\s*(?:HA|HECTARES?)\s+(?:DE\s+)?RESERVA\s+LEGAL",
+        ]:
+            m = re.search(padrao, t)
+            if m:
+                resultado["area_reserva_legal_averbada"] = m.group(1) + " ha"
+                break
+    elif sem_rl or not tem_rl:
+        resultado["averbacao_reserva_legal"] = "Não"
+
+    log.info("Certidão extraída: %s", resultado)
+    return resultado
+
 
 @app.route("/api/ler-certidao", methods=["POST", "OPTIONS"])
 def ler_certidao():
@@ -1385,10 +1470,6 @@ def ler_certidao():
     except Exception:
         return jsonify({"erro": "Token inválido."}), 401
 
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-    if not GEMINI_API_KEY:
-        return jsonify({"erro": "API de IA não configurada. Configure GEMINI_API_KEY no Render."}), 503
-
     pdf_bytes = None
     if request.files.get("pdf"):
         pdf_bytes = request.files["pdf"].read()
@@ -1405,52 +1486,12 @@ def ler_certidao():
     if len(pdf_bytes) > 10 * 1024 * 1024:
         return jsonify({"erro": "PDF muito grande (máx. 10 MB)."}), 400
 
-    pdf_b64 = base64.b64encode(pdf_bytes).decode()
-
-    prompt = """Analise esta certidão de inteiro teor de imóvel rural e extraia APENAS as seguintes informações em JSON puro (sem markdown, sem backticks):
-{
-  "matriculas": "número(s) da matrícula separados por vírgula, ex: 1234 ou 1234, 5678",
-  "area_ha": "área total em hectares como aparece no documento, ex: 117,1787 ha",
-  "ultimo_proprietario": "nome completo do último proprietário/adquirente atual",
-  "averbacao_reserva_legal": "Sim ou Não — se há averbação de reserva legal registrada no documento",
-  "area_reserva_legal_averbada": "área da reserva legal averbada em hectares como aparece no documento, ex: 45,2500 ha. Se não houver averbação, use string vazia"
-}
-Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JSON."""
-
     try:
-        import json as _json, time as _time
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"inline_data": {"mime_type": "application/pdf", "data": pdf_b64}},
-                    {"text": prompt}
-                ]
-            }],
-            "generationConfig": {
-                "maxOutputTokens": 2048,
-                "temperature": 0,
-                "thinkingConfig": {"thinkingBudget": 0}
-            }
-        }
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        texto = _extrair_texto_certidao(pdf_bytes)
+        if not texto.strip():
+            return jsonify({"erro": "Não foi possível extrair texto do PDF. Verifique se não é uma imagem escaneada."}), 400
 
-        # Tenta até 3 vezes com backoff em caso de 429
-        for tentativa in range(3):
-            r = req.post(url, headers={"Content-Type": "application/json"},
-                        json=payload, timeout=60)
-            if r.status_code == 429:
-                espera = 15 * (tentativa + 1)
-                log.warning("Gemini 429 — aguardando %ds (tentativa %d/3)", espera, tentativa+1)
-                _time.sleep(espera)
-                continue
-            r.raise_for_status()
-            break
-        else:
-            return jsonify({"erro": "Limite da API atingido. Aguarde alguns segundos e tente novamente."}), 429
-
-        texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        json_limpo = re.sub(r"```json|```", "", texto).strip()
-        dados = _json.loads(json_limpo)
+        dados = _parsear_certidao(texto)
         LogAcesso.registrar("certidao_lida", "ok", g.usuario.id)
         return jsonify({"sucesso": True, **dados})
 
