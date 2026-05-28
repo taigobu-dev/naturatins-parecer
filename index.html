@@ -663,6 +663,10 @@
                 <option value="Não">Não — sem averbação</option>
             </select>
         </div>
+        <div class="form-group">
+            <label>Área de RL Averbada (ha):</label>
+            <input type="text" id="cert_area_rl" placeholder="Preenchido automaticamente...">
+        </div>
     </div>
 
     <div class="search-box">
@@ -1832,7 +1836,7 @@ async function lerCertidoes() {
                 <span><strong>Matrícula:</strong> ${d.matriculas || '–'}</span>
                 <span><strong>Área:</strong> ${d.area_ha || '–'}</span>
                 <span><strong>Proprietário:</strong> ${d.ultimo_proprietario || '–'}</span>
-                <span><strong>Averbação RL:</strong> ${d.averbacao_reserva_legal || '–'}</span>`;
+                <span><strong>Averbação RL:</strong> ${d.averbacao_reserva_legal || '–'}${d.area_reserva_legal_averbada ? ' (' + d.area_reserva_legal_averbada + ')' : ''}</span>`;
         } catch(e) {
             document.getElementById(`cert-status-${i}`).className = 'cert-card-status err';
             document.getElementById(`cert-status-${i}`).textContent = '❌ Erro';
@@ -1850,16 +1854,10 @@ async function lerCertidoes() {
             .map(d => d.matriculas).filter(Boolean).join(', ');
         if (matriculas) document.getElementById('cert_matricula').value = matriculas;
 
-        // Área: soma todas as áreas numéricas
-        const areas = resultados.map(d => {
-            const m = (d.area_ha || '').replace(',', '.').match(/[\d.]+/);
-            return m ? parseFloat(m[0]) : 0;
-        });
-        const areaTotal = areas.reduce((a, b) => a + b, 0);
-        if (areaTotal > 0) {
-            document.getElementById('cert_area').value =
-                areaTotal.toLocaleString('pt-BR', {minimumFractionDigits:4, maximumFractionDigits:4}) + ' ha';
-        }
+        // Área: lista todas separadas por " + " (formatos variam, não soma)
+        const areas = resultados.map(d => d.area_ha).filter(Boolean);
+        if (areas.length > 0)
+            document.getElementById('cert_area').value = areas.join(' + ');
 
         // Proprietário: usa o do último arquivo lido com sucesso
         const ultimoComProprietario = [...resultados].reverse().find(d => d.ultimo_proprietario);
@@ -1872,6 +1870,11 @@ async function lerCertidoes() {
         const sel = document.getElementById('cert_averbacao_rl');
         if (temAverbacao) sel.value = 'Sim';
         else if (semAverbacao) sel.value = 'Não';
+
+        // Área de RL averbada: lista todas que tiverem
+        const areasRL = resultados.map(d => d.area_reserva_legal_averbada).filter(Boolean);
+        if (areasRL.length > 0)
+            document.getElementById('cert_area_rl').value = areasRL.join(' + ');
     }
 
     const ok  = resultados.length;

@@ -1412,7 +1412,8 @@ def ler_certidao():
   "matriculas": "número(s) da matrícula separados por vírgula, ex: 1234 ou 1234, 5678",
   "area_ha": "área total em hectares como aparece no documento, ex: 117,1787 ha",
   "ultimo_proprietario": "nome completo do último proprietário/adquirente atual",
-  "averbacao_reserva_legal": "Sim ou Não — se há averbação de reserva legal registrada no documento"
+  "averbacao_reserva_legal": "Sim ou Não — se há averbação de reserva legal registrada no documento",
+  "area_reserva_legal_averbada": "área da reserva legal averbada em hectares como aparece no documento, ex: 45,2500 ha. Se não houver averbação, use string vazia"
 }
 Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JSON."""
 
@@ -1448,7 +1449,6 @@ Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JS
             return jsonify({"erro": "Limite da API atingido. Aguarde alguns segundos e tente novamente."}), 429
 
         texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        log.info("Gemini resposta bruta: %s", texto[:300])
         json_limpo = re.sub(r"```json|```", "", texto).strip()
         dados = _json.loads(json_limpo)
         LogAcesso.registrar("certidao_lida", "ok", g.usuario.id)
