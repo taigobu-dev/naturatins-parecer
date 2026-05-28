@@ -1811,12 +1811,12 @@ async function lerCertidoes() {
         return card;
     });
 
-    // Processa cada arquivo (em paralelo)
+    // Processa arquivos em fila (sequencial) para não estoura limite da API
     const resultados = [];
-    await Promise.all(arquivos.map(async (arquivo, i) => {
+    for (let i = 0; i < arquivos.length; i++) {
         try {
             const formData = new FormData();
-            formData.append('pdf', arquivo);
+            formData.append('pdf', arquivos[i]);
             const r = await fetch(API_BASE + '/api/ler-certidao', {
                 method: 'POST',
                 headers: Session.headers(false),
@@ -1839,7 +1839,9 @@ async function lerCertidoes() {
             document.getElementById(`cert-dados-${i}`).innerHTML =
                 `<span style="color:#c62828;grid-column:1/-1;">${e.message}</span>`;
         }
-    }));
+        // Aguarda 1s entre cada certidão para não estourar o limite de 15 req/min
+        if (i < arquivos.length - 1) await new Promise(r => setTimeout(r, 1100));
+    }
 
     // Consolida os resultados nos campos do formulário
     if (resultados.length > 0) {

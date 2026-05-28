@@ -1417,27 +1417,32 @@ def ler_certidao():
 Se algum dado não for encontrado, use string vazia "". Responda APENAS com o JSON."""
 
     try:
-        import json as _json
-        r = req.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-            headers={"Content-Type": "application/json"},
-            json={
-                "contents": [{
-                    "parts": [
-                        {
-                            "inline_data": {
-                                "mime_type": "application/pdf",
-                                "data": pdf_b64,
-                            }
-                        },
-                        {"text": prompt}
-                    ]
-                }],
-                "generationConfig": {"maxOutputTokens": 500, "temperature": 0}
-            },
-            timeout=60,
-        )
-        r.raise_for_status()
+        import json as _json, time as _time
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"inline_data": {"mime_type": "application/pdf", "data": pdf_b64}},
+                    {"text": prompt}
+                ]
+            }],
+            "generationConfig": {"maxOutputTokens": 500, "temperature": 0}
+        }
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+
+        # Tenta até 3 vezes com backoff em caso de 429
+        for tentativa in range(3):
+            r = req.post(url, headers={"Content-Type": "application/json"},
+                        json=payload, timeout=60)
+            if r.status_code == 429:
+                espera = 5 * (tentativa + 1)
+                log.warning("Gemini 429 — aguardando %ds (tentativa %d/3)", espera, tentativa+1)
+                _time.sleep(espera)
+                continue
+            r.raise_for_status()
+            break
+        else:
+            return jsonify({"erro": "Limite da API atingido. Aguarde alguns segundos e tente novamente."}), 429
+
         texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
         json_limpo = re.sub(r"```json|```", "", texto).strip()
         dados = _json.loads(json_limpo)
