@@ -1839,8 +1839,8 @@ async function lerCertidoes() {
             document.getElementById(`cert-dados-${i}`).innerHTML =
                 `<span style="color:#c62828;grid-column:1/-1;">${e.message}</span>`;
         }
-        // Aguarda 1s entre cada certidão para não estourar o limite de 15 req/min
-        if (i < arquivos.length - 1) await new Promise(r => setTimeout(r, 1100));
+        // Aguarda 5s entre cada certidão para respeitar limite de 15 req/min
+        if (i < arquivos.length - 1) await new Promise(r => setTimeout(r, 5000));
     }
 
     // Consolida os resultados nos campos do formulário
