@@ -1111,11 +1111,11 @@ def _sigcar_ficha(s: req.Session, url_ficha: str) -> dict:
     if el_mod:
         mod_fiscais_txt = el_mod.get_text(strip=True)
 
-    # Data de cadastro
+    # Data e hora de cadastro
     data_cadastro = ""
     td_data = soup.select_one("table.historico_propriedades_entidades tbody tr td._data")
     if td_data:
-        data_cadastro = td_data.get_text(strip=True)[:10]
+        data_cadastro = td_data.get_text(strip=True)  # mantém data e hora completas
 
     return {
         "nome_requerente":         nome_req,

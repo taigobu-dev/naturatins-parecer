@@ -3205,21 +3205,39 @@ function lerResumoClassMaterial(rows) {
       if (lenha_m3 > lenha_st && lenha_st > 0)
         [lenha_m3, lenha_st] = [lenha_st, lenha_m3];
     }
-    if (/LAPIDADO/.test(lbl) && !/TOTAL/.test(lbl)) {
+    if (/LAPIDADO/.test(lbl) && !/TOTAL|TABELA/.test(lbl)) {
       const ns = row.map(num).filter(v => v !== null && v > 0);
-      // Tenta colM3 primeiro, depois colTotM3, depois qualquer valor positivo
+      // Tenta colM3LapSerr primeiro, depois colTotM3, depois colM3, depois qualquer valor positivo
       let val = 0;
       if (colM3LapSerr >= 0) val = num(row[colM3LapSerr]) || 0;
       if (!val && colTotM3 >= 0) val = num(row[colTotM3]) || 0;
       if (!val && colM3    >= 0) val = num(row[colM3])    || 0;
       if (!val) val = ns[0] || 0;
-      lap_m3 = val;
+      if (val) lap_m3 = val;
     }
     if (/SERRARIA/.test(lbl) && !/TOTAL/.test(lbl)) {
       const ns = row.map(num).filter(v => v !== null && v > 0);
       if (ns.length > 0) tora_m3 = ns[0];  // só sobrescreve se achar valor
     }
   }
+  // Fallback: se lap_m3 ainda zero, tenta "TABELA DE LAPIDADOS" → TOTAL
+  if (!lap_m3) {
+    for (let i = 0; i < rows.length; i++) {
+      const lbl = (rows[i] || []).map(v => str(v).toUpperCase()).join(' ');
+      if (/TABELA\s+DE\s+LAPIDADOS/.test(lbl)) {
+        for (let j = i + 1; j < Math.min(rows.length, i + 20); j++) {
+          const row = rows[j] || [];
+          const rowLbl = row.map(v => str(v).toUpperCase()).join(' ');
+          if (/\bTOTAL\b/.test(rowLbl)) {
+            const ns = row.map(num).filter(v => v !== null && v > 0);
+            if (ns.length > 0) { lap_m3 = ns[0]; break; }
+          }
+        }
+        if (lap_m3) break;
+      }
+    }
+  }
+
   return _vol(lenha_m3, lenha_st, lap_m3, tora_m3);
 }
 
