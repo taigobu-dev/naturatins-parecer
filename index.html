@@ -1264,12 +1264,13 @@ function gerarParecer(){
     const rlNec = (aLiq * 0.35).toFixed(4).replace('.',',');
 
     // Cálculo ARLS necessária
-    // Conforme Art. 123 COEMA/TO 07/2005: ARLS incide sobre ARD quando há supressão de espécies protegidas
+    // Para ACAIO/ACAIM/AEFS: sempre só ARD (Art. 123 COEMA/TO 07/2005)
+    // Para AEF: ARD + AUA quando sem supressão de espécies protegidas
+    const isCensoTipo = /^(ACAIO|ACAIM|AEFS)$/i.test(tipoSupr);
     const temSupressao = espProteg === 'SIM – Com supressão';
     const arlsARD  = (aARD * 0.05).toFixed(4).replace('.',',');
     const arlsAUA  = (aUA  * 0.05).toFixed(4).replace('.',',');
-    // Se há supressão: ARLS só sobre ARD. Caso contrário, mantém cálculo original ARD+AUA
-    const arlsTotal = temSupressao
+    const arlsTotal = (isCensoTipo || temSupressao)
         ? (aARD * 0.05).toFixed(4).replace('.',',')
         : ((aARD + aUA) * 0.05).toFixed(4).replace('.',',');
 
@@ -1440,7 +1441,7 @@ function gerarParecer(){
                 <tr><th>Tipo da Área</th><th>Área (ha)</th><th>FR Espécies Protegidas</th><th>ARLS</th></tr>
             </thead>
             <tbody>
-                ${temSupressao ? `
+                ${(isCensoTipo || temSupressao) ? `
                 <tr><td>ARD</td><td>${fmt(aARD)} ha</td><td>5%</td><td>${fmt(aARD)} × 0,05 = ${arlsARD} ha</td></tr>
                 <tr class="total-row"><td><strong>TOTAL</strong></td><td><strong>${fmt(aARD)} ha</strong></td><td>-</td><td><strong>${arlsTotal} ha</strong></td></tr>
                 ` : `
@@ -3206,8 +3207,13 @@ function lerResumoClassMaterial(rows) {
     }
     if (/LAPIDADO/.test(lbl) && !/TOTAL/.test(lbl)) {
       const ns = row.map(num).filter(v => v !== null && v > 0);
-      if (colM3LapSerr >= 0) lap_m3 = num(row[colM3LapSerr]) || ns[0] || 0;
-      else lap_m3 = ns[0] || 0;
+      // Tenta colM3 primeiro, depois colTotM3, depois qualquer valor positivo
+      let val = 0;
+      if (colM3LapSerr >= 0) val = num(row[colM3LapSerr]) || 0;
+      if (!val && colTotM3 >= 0) val = num(row[colTotM3]) || 0;
+      if (!val && colM3    >= 0) val = num(row[colM3])    || 0;
+      if (!val) val = ns[0] || 0;
+      lap_m3 = val;
     }
     if (/SERRARIA/.test(lbl) && !/TOTAL/.test(lbl)) {
       const ns = row.map(num).filter(v => v !== null && v > 0);
