@@ -1148,8 +1148,6 @@ function toggleDocPend(pendId, valor){
 }
 
 const _DOC_ITENS = [
-    {id:'doc_req',    label:'Requerimento padrão NATURATINS (Código 300)'},
-    {id:'doc_form',   label:'Formulário de caracterização do grupo florestal modelo NATURATINS'},
     {id:'doc_car',    label:'Recibo de inscrição do imóvel no CAR'},
     {id:'doc_croqui', label:'Croqui de acesso ao imóvel (arquivo kml)'},
     {id:'doc_cert',   label:'Certidão de inteiro teor / documentação de posse'},
@@ -1266,9 +1264,14 @@ function gerarParecer(){
     const rlNec = (aLiq * 0.35).toFixed(4).replace('.',',');
 
     // Cálculo ARLS necessária
-    const arlsARD = (aARD * 0.05).toFixed(4).replace('.',',');
-    const arlsAUA = (aUA * 0.05).toFixed(4).replace('.',',');
-    const arlsTotal = ((aARD + aUA) * 0.05).toFixed(4).replace('.',',');
+    // Conforme Art. 123 COEMA/TO 07/2005: ARLS incide sobre ARD quando há supressão de espécies protegidas
+    const temSupressao = espProteg === 'SIM – Com supressão';
+    const arlsARD  = (aARD * 0.05).toFixed(4).replace('.',',');
+    const arlsAUA  = (aUA  * 0.05).toFixed(4).replace('.',',');
+    // Se há supressão: ARLS só sobre ARD. Caso contrário, mantém cálculo original ARD+AUA
+    const arlsTotal = temSupressao
+        ? (aARD * 0.05).toFixed(4).replace('.',',')
+        : ((aARD + aUA) * 0.05).toFixed(4).replace('.',',');
 
     // Linhas sobreposição TI/UC/Quilombola
     const linhaTerritorios = (temTI==='Sim' || temUC==='Sim' || temQuil==='Sim')
@@ -1437,9 +1440,14 @@ function gerarParecer(){
                 <tr><th>Tipo da Área</th><th>Área (ha)</th><th>FR Espécies Protegidas</th><th>ARLS</th></tr>
             </thead>
             <tbody>
+                ${temSupressao ? `
+                <tr><td>ARD</td><td>${fmt(aARD)} ha</td><td>5%</td><td>${fmt(aARD)} × 0,05 = ${arlsARD} ha</td></tr>
+                <tr class="total-row"><td><strong>TOTAL</strong></td><td><strong>${fmt(aARD)} ha</strong></td><td>-</td><td><strong>${arlsTotal} ha</strong></td></tr>
+                ` : `
                 <tr><td>ARD</td><td>${fmt(aARD)} ha</td><td>5%</td><td>${fmt(aARD)} × 0,05 = ${arlsARD} ha</td></tr>
                 <tr><td>AUA</td><td>${fmt(aUA)} ha</td><td>5%</td><td>${fmt(aUA)} × 0,05 = ${arlsAUA} ha</td></tr>
                 <tr class="total-row"><td><strong>TOTAL</strong></td><td><strong>${fmt(aARD+aUA)} ha</strong></td><td>-</td><td><strong>${arlsTotal} ha</strong></td></tr>
+                `}
             </tbody>
         </table>
         <div class="body-text">
@@ -1464,6 +1472,9 @@ function gerarParecer(){
             <p>- Atividade a ser implantada na ARD: <strong>${atividadeARD}</strong>;</p>
             <p>- Tipo de Desmatamento: <strong>${destoca==='SIM' ? 'Mecanizado com destoca' : 'Sem destoca'}</strong>;</p>
             <p>- Supressão de Espécies Protegidas: <strong>${espProteg==='SIM – Com supressão' ? 'Com supressão' : 'Sem supressão de espécies protegidas'}</strong>;</p>
+            ${/^(ACAIO|ACAIM|AEFS)$/i.test(tipoSupr) ? `
+            <p>- Processo de Amostragem: <strong>CENSO FLORESTAL</strong>;</p>
+            ` : `
             <p>- Processo de Amostragem: <strong>${invAmostr}</strong>;</p>
             <p>- Quantidade de Amostras Exigidas: <strong>${invQExig} amostras</strong>;</p>
             <p>- Quantidade de Amostras Lançadas: <strong>${invQLanc} amostras – ${amostSuf==='SIM'?'suficiente':'insuficiente'}</strong>;</p>
@@ -1474,6 +1485,7 @@ function gerarParecer(){
             <p>- Coeficiente de Variação: <strong>± ${invCV.toFixed(2).replace('.',',')} %</strong>;</p>
             <p>- Volume por Hectare: <strong>${fmt(invVolHa)} m³/ha</strong>;</p>
             <p>- Erro de Amostragem Relativo: <strong>${invErro.toFixed(2).replace('.',',')} %</strong>, estando ${invErro<=20?'abaixo':'acima'} do erro máximo de 20,0% para volumetria ${invVolHa<50?'inferior':'superior'} a 50 m³/hectares.</p>
+            `}
         </div>
 
         <!-- REPOSIÇÃO -->
@@ -3357,222 +3369,6 @@ function _vol(m3, st, lap, tora) {
  * ══════════════════════════════════════════════════════════════ */
 
 /**
- * FORMATO G — Inventário Estratificado (2, 3, 4, 5 estratos)
- * Aba stat: "IF_N ESTRATOS" ou "Analise estatística" (pivot col0=parcela,col1=vol)
- * Também lê o painel lateral de estatísticas (col4-7) quando disponível.
- */
-function lerEstatisticaEstratificada(wb, rowsEst, nEstratos) {
-  // 1) Tenta ler o painel lateral de estatísticas da aba IF_N ESTRATOS
-  //    Parâmetros confiáveis estão nas tabelas de parâmetros (L60-L110)
-  let ard = 0, tamP = 0.1, uasLanc = 0, uasExig = 0;
-  let areaAmostrada = 0, intReal = 0;
-
-  for (let i = 0; i < rowsEst.length; i++) {
-    const r   = rowsEst[i] || [];
-    const lbl = str(r[0]).toUpperCase() + ' ' + str(r[1]).toUpperCase() + ' ' + str(r[5]).toUpperCase();
-    const nums = r.map(num).filter(v => v !== null && v > 0);
-
-    if (/TAMANHO DA UNIDADE AMOSTRAL|TAMANHO.*U\.?A/i.test(str(r[1]))) {
-      // Procura o tamanho em ha (valor < 1)
-      const v = r.map(num).find(v => v !== null && v > 0 && v < 1);
-      if (v) tamP = v;
-    }
-    if (/ÁREA A SER DESMAT|ARD/.test(lbl) || /ÁREA.*SER DESMAT/i.test(str(r[4]))) {
-      const v = r.map(num).find(v => v !== null && v > 1);
-      if (v) ard = v;
-    }
-    if (/INVENTARIADAS/.test(str(r[5]).toUpperCase())) {
-      const v = num(r[6]);
-      if (v > 0) uasLanc = Math.round(v);
-    }
-    if (/EXIGIDO/.test(str(r[5]).toUpperCase())) {
-      const v = num(r[6]);
-      if (v > 0) uasExig = Math.ceil(v);
-    }
-    if (/INTENS.*AMOST.*REAL|AMOST.*REALIZADA/i.test(str(r[5]))) {
-      const v = num(r[6]);
-      if (v > 0) intReal = v < 1 ? v * 100 : v;
-    }
-    if (/ÁREA AMOSTRADA|AREA AMOSTRADA/i.test(str(r[5]))) {
-      const v = num(r[6]);
-      if (v > 0) areaAmostrada = v;
-    }
-    // TOTAL linha da tabela de estratos (tem área e UAs totais)
-    if (/^TOTAL$/.test(str(r[0]).trim()) && nums.length >= 2) {
-      // L91 no 2-estratos: C2=area_total C6=N_total C7=n_lanc
-      const areaV = num(r[1]);
-      const nV    = num(r[6]);
-      if (areaV > 1 && !ard) ard = areaV;
-      if (nV > 1 && !uasLanc) uasLanc = Math.round(nV);
-    }
-  }
-
-  // 2) Recalcula areaAmostrada se possível
-  if (!areaAmostrada && uasLanc > 0 && tamP > 0) areaAmostrada = +(uasLanc * tamP).toFixed(4);
-
-  // 3) Fallback: ler a aba "Analise estatística" como pivot col0=parcela/col1=vol
-  const abaAE = wb.SheetNames.find(n => /analise\s+estat/i.test(n));
-  if (abaAE) {
-    const rowsAE = toRows(wb.Sheets[abaAE]);
-    const res = _lerPivotVolumes(rowsAE, tamP, ard, areaAmostrada, uasLanc, uasExig);
-    if (res) { res.formato = `Estratificado ${nEstratos} Estratos`; return res; }
-  }
-
-  // 4) Fallback: "Dados - Impressão" ou "Volume por parcela" com Parcelas/Total
-  for (const nomeCand of ['Dados - Impressão', 'Dados-Impressão', 'Volume por parcela']) {
-    const abaCand = wb.SheetNames.find(n => n.trim() === nomeCand);
-    if (abaCand) {
-      const res = _lerPivotVolumes(toRows(wb.Sheets[abaCand]), tamP, ard, areaAmostrada, uasLanc, uasExig);
-      if (res) { res.formato = `Estratificado ${nEstratos} Estratos`; return res; }
-    }
-  }
-  return null;
-}
-
-/**
- * Lê um pivot "Parcelas | Total" (col0=int, col1=vol_m3) e calcula estatísticas.
- * Usado como fallback para Estratificado e para o formato "Analise estatística".
- */
-function _lerPivotVolumes(rows, tamP, ard, areaAmostrada, uasLancHint, uasExigHint) {
-  if (!rows || rows.length < 3) return null;
-
-  // Encontra onde começam os dados (linha com col0=1 e col1=número positivo)
-  let iInicio = -1;
-  for (let i = 0; i < Math.min(rows.length, 10); i++) {
-    const r  = rows[i] || [];
-    const c0 = str(r[0]).toUpperCase().trim();
-    const c1 = str(r[1]).toUpperCase().trim();
-    // Linha de cabeçalho (Parcelas | Total)
-    if (/^PARCELAS?$/.test(c0) && /^TOTAL$/.test(c1)) { iInicio = i + 1; break; }
-  }
-  if (iInicio < 0) {
-    // Tenta iniciar direto pela primeira linha que tem col0=inteiro e col1=positivo
-    for (let i = 0; i < Math.min(rows.length, 8); i++) {
-      const r = rows[i] || [];
-      const ua = num(r[0]), vol = num(r[1]);
-      if (ua !== null && ua > 0 && Number.isInteger(ua) && vol !== null && vol > 0) {
-        iInicio = i; break;
-      }
-    }
-  }
-  if (iInicio < 0) return null;
-
-  const volumes = [];
-  let uasLanc = uasLancHint, uasExig = uasExigHint;
-  let eRelLido = 0, cvLido = 0, leLido = 20;
-
-  for (let i = iInicio; i < rows.length; i++) {
-    const r   = rows[i] || [];
-    const c0  = str(r[0]).toUpperCase().trim();
-    const ua  = num(r[0]);
-    const vol = num(r[1]);
-
-    if (/^TOTAL/.test(c0)) continue;
-
-    // Detecta painel lateral de estatísticas (col4/col5/col6/col7)
-    for (let ci = 3; ci < Math.min(r.length, 10); ci++) {
-      const lbl = str(r[ci]).toUpperCase().trim();
-      const val = num(r[ci + 1]) ?? num(r[ci + 2]);
-      if (!lbl || val === null) continue;
-      if (/COEFICIENTE DE VARIA/.test(lbl) && val > 0)  cvLido  = val > 1 ? val : val * 100;
-      if (/LIMITE DE ERRO/.test(lbl) && val > 0)          leLido  = val;
-      if (/ERRO DE AMOSTRAGEM RELATIVO/.test(lbl) && val > 0) eRelLido = val > 1 ? val : val * 100;
-      if (/EXIGIDO/.test(lbl) && val > 0)                uasExig = Math.ceil(val);
-      if (/INVENTARIADAS/.test(lbl) && val > 0)          uasLanc = Math.round(val);
-    }
-
-    if (ua !== null && ua > 0 && vol !== null && vol >= 0) volumes.push(vol);
-  }
-  if (!volumes.length) return null;
-
-  if (!tamP) tamP = 0.1;
-  const N    = ard > 0 && tamP > 0 ? ard / tamP : 0;
-  const calc = calcEstatistica(volumes, tamP, ard, N);
-  const res  = _resultado('Estratificado', tamP, volumes,
-                           uasLanc || volumes.length, uasExig || calc.nNec, calc, ard);
-  if (cvLido   > 0) res.cv   = +cvLido.toFixed(2);
-  if (eRelLido > 0) res.eRel = +eRelLido.toFixed(2);
-  if (leLido   > 0) res.LE   = leLido;
-  res.aprovado = res.eRel <= res.LE;
-  if (areaAmostrada > 0) res.areaAmostrada = +areaAmostrada.toFixed(4);
-  return res;
-}
-
-/**
- * FORMATO H — Censo 100% direto (ACAIO/ACAIM/AEFS sem aba resumo)
- * Aba: "2 _ DADOS PROC_AAS"
- * Lê col Utilidade + col VTcc(m³) ou col VT1cc(m³) e soma por destinação.
- */
-function lerVolumesCensoProc(rows) {
-  if (!rows || rows.length < 3) return null;
-  // Acha linha de cabeçalho
-  let iHdr = -1;
-  for (let i = 0; i < Math.min(rows.length, 5); i++) {
-    const r = (rows[i] || []).map(v => str(v).toLowerCase());
-    if (r.some(c => /^vtcc|^vt1cc|^vtcc\(|volume\s*total|utilidade|destina/i.test(c))) {
-      iHdr = i; break;
-    }
-  }
-  if (iHdr < 0) return null;
-
-  const hdr     = (rows[iHdr] || []).map(v => str(v).toLowerCase());
-  const colUtil = hdr.findIndex(c => /utilidade|destina/i.test(c));
-  // Prefere VT1cc (extrapolado para a área) sobre VTcc (por parcela)
-  const colVol  = hdr.findIndex(c => /^vt1cc|vt1cc/.test(c)) >= 0
-    ? hdr.findIndex(c => /^vt1cc|vt1cc/.test(c))
-    : hdr.findIndex(c => /^vtcc|vtcc/.test(c));
-
-  if (colVol < 0) return null;
-
-  let lenha_m3 = 0, lap_m3 = 0, tora_m3 = 0;
-
-  for (let i = iHdr + 1; i < rows.length; i++) {
-    const r    = rows[i] || [];
-    const vol  = num(r[colVol]) || 0;
-    if (vol <= 0) continue;
-    const util = (colUtil >= 0 ? str(r[colUtil]) : 'LENHA').toUpperCase().trim();
-    if (/LENHA|GALHO/.test(util))           lenha_m3 += vol;
-    else if (/LAPIDAD/.test(util))           lap_m3   += vol;
-    else if (/TORA|SERRAR|MOUR/.test(util)) tora_m3  += vol;
-    else                                    lenha_m3  += vol;
-  }
-
-  if (lenha_m3 === 0 && lap_m3 === 0 && tora_m3 === 0) return null;
-  const lenha_st = +(lenha_m3 * 1.5).toFixed(4);
-  return _vol(lenha_m3, lenha_st, lap_m3, tora_m3);
-}
-
-/**
- * FORMATO I — "Classificação e destinação" (LAMARÃO / censo arbóreo)
- * Header: [_, Espécie, Lenha(m³), Estaca(m³), Lapidado(m³), Serraria(m³), ...]
- * Soma as colunas por tipo.
- */
-function lerClassificacaoDestinacao(rows) {
-  if (!rows || rows.length < 2) return null;
-  let iHdr = -1, colLenha = -1, colLap = -1, colSerr = -1;
-  for (let i = 0; i < Math.min(rows.length, 5); i++) {
-    const r = (rows[i] || []).map(v => str(v).toLowerCase().trim());
-    const iL   = r.findIndex(c => /^lenha/.test(c));
-    const iLap = r.findIndex(c => /lapidado/.test(c));
-    const iS   = r.findIndex(c => /serraria/.test(c));
-    if (iL >= 0) { iHdr = i; colLenha = iL; colLap = iLap; colSerr = iS; break; }
-  }
-  if (iHdr < 0 || colLenha < 0) return null;
-
-  let lenha_m3 = 0, lap_m3 = 0, tora_m3 = 0;
-  for (let i = iHdr + 1; i < rows.length; i++) {
-    const r   = rows[i] || [];
-    const lbl = str(r[1] !== undefined ? r[1] : r[0]).toUpperCase().trim();
-    if (!lbl || /^TOTAL/.test(lbl)) continue;
-    lenha_m3 += num(r[colLenha]) || 0;
-    if (colLap  >= 0) lap_m3  += num(r[colLap])  || 0;
-    if (colSerr >= 0) tora_m3 += num(r[colSerr]) || 0;
-  }
-  if (lenha_m3 === 0 && lap_m3 === 0 && tora_m3 === 0) return null;
-  return _vol(lenha_m3, +(lenha_m3 * 1.5).toFixed(4), lap_m3, tora_m3);
-}
-
-/**
  * Lê os dados estatísticos do inventário de um workbook.
  * Tenta cada formato em ordem de prioridade.
  */
@@ -3624,25 +3420,6 @@ function lerInventario(wb) {
     const rows = toRows(wb.Sheets[abaSis]);
     if (/SISTEMÁTIC|SISTEMATIC/i.test(str((rows[0] || [])[0])))
       return lerSistematico(rows);
-  }
-
-  // ── Formato G: Estratificado (IF_N ESTRATOS) ──────────────
-  const abaEst = S.find(n => /IF[_\s]*(\d)\s*ESTRAT/i.test(n));
-  if (abaEst) {
-    const m = abaEst.match(/(\d)/);
-    const nEst = m ? parseInt(m[1]) : 2;
-    const res  = lerEstatisticaEstratificada(wb, toRows(wb.Sheets[abaEst]), nEst);
-    if (res && res.n > 0) return res;
-  }
-  // Também tenta pela aba "Analise estatística" que tem pivot col0=parcela/col1=vol
-  const abaAEPivot = S.find(n => /analise\s+estat/i.test(n));
-  if (abaAEPivot) {
-    const rows = toRows(wb.Sheets[abaAEPivot]);
-    const isSafira = rows.slice(0, 8).some(r => /^CALCULOS$/i.test(str((r || [])[3]).trim()));
-    if (!isSafira) {
-      const res = _lerPivotVolumes(rows, 0.1, 0, 0, 0, 0);
-      if (res && res.n > 0) { res.formato = 'Estratificado'; return res; }
-    }
   }
 
   // ── Fallback: varrer todas as abas procurando U.A.(n) ─────
@@ -3888,20 +3665,6 @@ function lerVolumesCensoExtra(wb) {
     if (v) return v;
   }
 
-  // ── CLASSIFICAÇÃO E DESTINAÇÃO (censo arbóreo / LAMARÃO) ──
-  const abaCD = S.find(n => /classifica[çc][aã]o.+destina|destina.+classifica/i.test(n));
-  if (abaCD) {
-    const v = lerClassificacaoDestinacao(toRows(wb.Sheets[abaCD]));
-    if (v) return v;
-  }
-
-  // ── CENSO DIRETO: 2 _ DADOS PROC_AAS sem aba de resumo ──
-  const abaProc = S.find(n => /2\s*_?\s*DADOS\s*PROC|DADOS.PROC/i.test(n));
-  if (abaProc) {
-    const v = lerVolumesCensoProc(toRows(wb.Sheets[abaProc]));
-    if (v) return v;
-  }
-
   return null;
 }
 
@@ -3912,7 +3675,7 @@ function lerVolumesPlano(wb) {
   const S = wb.SheetNames;
   const ZERO = _vol(0, 0, 0, 0);
 
-  // ── CLASS MATERIAL LENHOSO (AAS padrão + SINAFLOR) ───────
+  // ── CLASS MATERIAL LENHOSO (AAS padrão) ──────────────────
   const abasClass = S.filter(n => /class.*lenhoso|4\s*_?\s*class/i.test(n));
   for (const aba of abasClass) {
     const v = lerResumoClassMaterial(toRows(wb.Sheets[aba]));
@@ -3930,13 +3693,6 @@ function lerVolumesPlano(wb) {
   const abaClass = S.find(n => /classificação do material/i.test(n));
   if (abaClass) {
     const v = lerClassificacaoMaterial(toRows(wb.Sheets[abaClass]));
-    if (v && v.vol_lenha_m3 > 0) return v;
-  }
-
-  // ── CLASSIFICAÇÃO E DESTINAÇÃO (estratificado/censo) ─────
-  const abaCD = S.find(n => /classifica[çc][aã]o.+destina|destina.+classifica/i.test(n));
-  if (abaCD) {
-    const v = lerClassificacaoDestinacao(toRows(wb.Sheets[abaCD]));
     if (v && v.vol_lenha_m3 > 0) return v;
   }
 
