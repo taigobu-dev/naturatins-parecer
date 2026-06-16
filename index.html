@@ -594,8 +594,8 @@
         <div class="form-group"><label>Nº do Requerimento (SIGAM):</label><input type="text" id="num_requerimento" placeholder="ex: 12454/2025"></div>
         <div class="form-group"><label>Nº do Parecer:</label><input type="text" id="num_parecer" placeholder="ex: 0164-2026"></div>
         <div class="form-group"><label>Data do Parecer:</label><input type="date" id="data_parecer"></div>
-        <div class="form-group"><label>Nome do Requerente:</label><input type="text" id="nome_requerente"></div>
-        <div class="form-group"><label>CPF/CNPJ do Requerente:</label><input type="text" id="cpf_requerente"></div>
+        <div class="form-group"><label>Nome do Requerente:</label><input type="text" id="nome_requerente" placeholder="ex: JOÃO DA SILVA (preenchido pelo CAR)"></div>
+        <div class="form-group"><label>CPF/CNPJ do Requerente:</label><input type="text" id="cpf_requerente" placeholder="ex: 000.000.000-00 (preenchido pelo CAR)"></div>
         <div class="form-group"><label>Atividade:</label>
             <select id="atividade">
                 <option value="">Selecione...</option>
@@ -615,7 +615,7 @@
         <div class="form-group"><label>ART / Registro:</label><input type="text" id="art_resp_tecnico" placeholder="ex: TO20250558061"></div>
         <div class="form-group"><label>E-mail Resp. Técnico:</label><input type="text" id="email_resp"></div>
         <div class="form-group"><label>Telefone Resp. Técnico:</label><input type="text" id="tel_resp"></div>
-        <div class="form-group"><label>Denominação do Imóvel:</label><input type="text" id="nome_imovel" placeholder="ex: FAZENDA SANTOS REIS (M-1552)"></div>
+        <div class="form-group"><label>Denominação do Imóvel:</label><input type="text" id="nome_imovel" placeholder="ex: FAZENDA BOA ESPERANÇA (preenchido pelo CAR)"></div>
     </div>
 
     <h2>Dados do Imóvel – CAR / SIGCAR</h2>
@@ -1305,15 +1305,17 @@ function gerarParecer(){
         : `<tr><td>Volume Total em TORA</td><td><strong>-</strong></td><td>-</td></tr>`;
 
     // Pendências automáticas do checklist (NÃO / PARCIAL)
-    const pendAutoHtml = docPends.length > 0
-        ? docPends.map((p,i) =>
-            `<p>${i+1}. ${p.label}${p.status==='PARCIAL'?' <em>(PARCIAL)</em>':''}: ${p.desc||'Documentação pendente/incompleta.'}</p>`
-          ).join('')
+    const pendAutoItens = docPends.length > 0
+        ? docPends.map(p => `${p.label}${p.status==='PARCIAL'?' <em>(PARCIAL)</em>':''}: ${p.desc||'Documentação pendente/incompleta.'}`)
+        : [];
+    const pendManualItens = motivoDesfav
+        ? motivoDesfav.split('\n').map(l=>l.trim()).filter(Boolean)
+        : [];
+    // Junta tudo e numera sequencialmente
+    const todasPendItens = [...pendAutoItens, ...pendManualItens];
+    const todasPendHtml = todasPendItens.length > 0
+        ? todasPendItens.map((txt, i) => `<p>${i+1}. ${txt}</p>`).join('')
         : '';
-    const pendManualHtml = motivoDesfav
-        ? motivoDesfav.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<p>${l}</p>`).join('')
-        : '';
-    const todasPendHtml = [pendAutoHtml, pendManualHtml].filter(Boolean).join('');
 
     // NUP e Requerimento
     const linhaReq = numReq ? `NUP. <strong>${numProcesso}</strong> onde solicita` : `onde solicita`;
@@ -1544,10 +1546,10 @@ function gerarParecer(){
 </div>
 
 <!-- CONCLUSÃO -->
-<div class="section-box no-break">
+<div class="section-box">
     <div class="section-title">CONCLUSÃO</div>
     <div class="section-body">
-        <div class="conclusao-box">
+        <div class="conclusao-box" style="page-break-inside:auto;">
             <p>Pelo exposto, conclui-se <strong>${conclusao}</strong> ao deferimento do pleito.</p>
             ${todasPendHtml ? `<div class="pend-box"><div class="pend-title">PENDÊNCIA(S)/MOTIVO(S):</div>${todasPendHtml}</div>` : ''}
             <p>Recomenda-se que, a expedição dos atos administrativos correspondentes às atividades ora requeridas, a saber:</p>
