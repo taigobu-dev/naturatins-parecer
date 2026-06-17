@@ -3508,12 +3508,19 @@ function lerQuadroResumo(rows) {
  * com duas tabelas lado a lado (espécies comuns + espécies imunes ao corte),
  * cada uma terminando em uma linha "TOTAL".
  */
+/**
+ * Lê o formato "Quadro Resumo Pecuária": colunas TORA(m³)/ESTACA(m³)/LENHA(m³)/LENHA(st)
+ * com duas tabelas lado a lado (espécies comuns + espécies imunes ao corte).
+ * Cada bloco pode ter mais de uma linha "TOTAL" (ex: total parcial + linha de
+ * conferência); usamos sempre a ÚLTIMA ocorrência de "TOTAL" de cada bloco,
+ * que é a que fica alinhada com o total do bloco vizinho e contém o valor
+ * definitivo daquele bloco.
+ */
 function lerQuadroResumoPecuaria(rows) {
-  // Encontra o cabeçalho: linha que contém "TORA" e "LENHA" e ("FUSTE" ou "(m³)")
-  let iHdr = -1, headerCols = null;
+  // 1) Localiza a linha de cabeçalho: contém "TORA" e "LENHA" junto de "FUSTE" ou "M³"
+  let iHdr = -1;
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i] || [];
-    const txt = row.map(v => str(v).toUpperCase()).join(' ');
+    const txt = (rows[i] || []).map(v => str(v).toUpperCase()).join(' ');
     if (/TORA/.test(txt) && /LENHA/.test(txt) && /(FUSTE|M[³3])/.test(txt)) {
       iHdr = i;
       break;
@@ -3521,9 +3528,9 @@ function lerQuadroResumoPecuaria(rows) {
   }
   if (iHdr < 0) return null;
 
-  // Mapeia colunas pelo cabeçalho (pode ter 2 blocos: esquerda e direita)
+  // 2) Mapeia cada bloco de colunas (pode haver vários blocos repetidos lado a lado)
   const hdr = rows[iHdr] || [];
-  const blocos = []; // cada bloco: {colEspecie, colTora, colEstaca, colLenhaM3, colLenhaSt}
+  const blocos = [];
   let atual = null;
   hdr.forEach((v, i) => {
     const s = str(v).toUpperCase();
@@ -3531,27 +3538,28 @@ function lerQuadroResumoPecuaria(rows) {
       atual = { colEspecie: i, colTora: -1, colEstaca: -1, colLenhaM3: -1, colLenhaSt: -1 };
       blocos.push(atual);
     } else if (atual) {
-      if (/TORA/.test(s))                                   atual.colTora    = i;
-      else if (/ESTACA/.test(s))                             atual.colEstaca  = i;
-      else if (/LENHA/.test(s) && /\(\s*ST\s*\)/.test(s))    atual.colLenhaSt = i;
-      else if (/LENHA/.test(s))                              atual.colLenhaM3 = i;
+      if (/TORA/.test(s))                                atual.colTora    = i;
+      else if (/ESTACA/.test(s))                          atual.colEstaca  = i;
+      else if (/LENHA/.test(s) && /\(\s*ST\s*\)/.test(s)) atual.colLenhaSt = i;
+      else if (/LENHA/.test(s))                           atual.colLenhaM3 = i;
     }
   });
   if (blocos.length === 0) return null;
 
+  // 3) Para cada bloco, varre as linhas após o cabeçalho e usa a PRIMEIRA linha
+  //    "TOTAL" encontrada (o subtotal exclusivo daquele bloco). Linhas de
+  //    conferência que aparecem depois (ex: "VOL RESUMO", segundo "TOTAL"
+  //    alinhado com outro bloco) são ignoradas.
   let lenha_m3 = 0, lenha_st = 0, tora_m3 = 0;
-  // Para cada bloco, soma até encontrar a linha "TOTAL" daquele bloco
   for (const bloco of blocos) {
-    let parou = false;
-    for (let i = iHdr + 1; i < rows.length && !parou; i++) {
+    for (let i = iHdr + 1; i < rows.length; i++) {
       const row = rows[i] || [];
       const lblEsp = str(row[bloco.colEspecie]).toUpperCase().trim();
-      if (/^TOTAL$/.test(lblEsp)) {
-        // Usa o próprio valor da linha TOTAL (mais confiável que somar)
+      if (/^TOTAL/.test(lblEsp)) {
         if (bloco.colLenhaM3 >= 0) lenha_m3 += num(row[bloco.colLenhaM3]) || 0;
         if (bloco.colLenhaSt >= 0) lenha_st += num(row[bloco.colLenhaSt]) || 0;
         if (bloco.colTora    >= 0) tora_m3  += num(row[bloco.colTora])    || 0;
-        parou = true;
+        break; // primeira ocorrência de TOTAL é o subtotal correto deste bloco
       }
     }
   }

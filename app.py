@@ -1493,10 +1493,13 @@ def exportar_docx():
         style.font.name = "Arial"
         style.font.size = Pt(10.5)
 
-        def add_paragraph(text, bold=False, size=10.5, align=None, color=None, italic=False):
+        def add_paragraph(text, bold=False, size=10.5, align=None, color=None, italic=False, space_after=4):
             p = doc.add_paragraph()
             if align == "center":
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif align == "right":
+                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p.paragraph_format.space_after = Pt(space_after)
             run = p.add_run(text)
             run.bold = bold
             run.italic = italic
@@ -1505,6 +1508,10 @@ def exportar_docx():
             if color:
                 run.font.color.rgb = RGBColor(*color)
             return p
+
+        def clean_text(node):
+            txt = node.get_text(separator=" ", strip=True)
+            return re.sub(r"\s+", " ", txt)
 
         def process_node(node):
             tag = getattr(node, "name", None)
@@ -1525,18 +1532,30 @@ def exportar_docx():
                         log.warning("Erro ao inserir imagem no docx: %s", e)
                 return
 
-            if tag in ("h1", "h2", "h3") or "section-title" in classes:
-                txt = node.get_text(separator=" ", strip=True)
-                txt = re.sub(r"\s+", " ", txt)
+            # Título "PARECER TÉCNICO Nº ..." — centralizado
+            if "parecer-title" in classes:
+                txt = clean_text(node)
                 if txt:
-                    add_paragraph(txt, bold=True, size=13, color=(15, 76, 30))
+                    add_paragraph(txt, bold=True, size=15, align="center", color=(15, 76, 30), space_after=2)
+                return
+
+            # Data "PALMAS, dd/mm/aaaa" do cabeçalho — alinhada à direita
+            if "parecer-date" in classes:
+                txt = clean_text(node)
+                if txt:
+                    add_paragraph(txt, bold=False, size=10, align="right", italic=True, space_after=10)
+                return
+
+            if tag in ("h1", "h2", "h3") or "section-title" in classes:
+                txt = clean_text(node)
+                if txt:
+                    add_paragraph(txt, bold=True, size=13, color=(15, 76, 30), space_after=6)
                 return
 
             if "sub-section" in classes:
-                txt = node.get_text(separator=" ", strip=True)
-                txt = re.sub(r"\s+", " ", txt)
+                txt = clean_text(node)
                 if txt:
-                    add_paragraph(txt, bold=True, size=11.5)
+                    add_paragraph(txt, bold=True, size=11.5, space_after=4)
                 return
 
             if tag == "table":
@@ -1551,19 +1570,32 @@ def exportar_docx():
                     row_cells = table.add_row().cells
                     for i, c in enumerate(cells):
                         if i < ncols:
-                            cell_txt = c.get_text(separator=" ", strip=True)
-                            row_cells[i].text = re.sub(r"\s+", " ", cell_txt)
+                            cell_txt = re.sub(r"\s+", " ", c.get_text(separator=" ", strip=True))
+                            row_cells[i].text = cell_txt
                             for p in row_cells[i].paragraphs:
                                 for run in p.runs:
                                     run.font.size = Pt(9.5)
                                     run.font.name = "Arial"
                                     if c.name == "th":
                                         run.bold = True
+                doc.add_paragraph().paragraph_format.space_after = Pt(2)
+                return
+
+            # Bloco de pendências: título "PENDÊNCIAS" + itens, antes da conclusão
+            if "pend-box" in classes:
+                add_paragraph("PENDÊNCIAS", bold=True, size=12, color=(198, 40, 40), space_after=4)
+                for item in node.find_all("p"):
+                    txt = clean_text(item)
+                    if txt:
+                        add_paragraph(txt, bold=False, size=10, space_after=3)
+                return
+
+            # Já tratado dentro de pend-box; ignora título solto caso apareça fora
+            if "pend-title" in classes:
                 return
 
             if tag in ("p", "li"):
-                txt = node.get_text(separator=" ", strip=True)
-                txt = re.sub(r"\s+", " ", txt)
+                txt = clean_text(node)
                 if txt:
                     bold = node.find("strong") is not None and len(txt) < 200
                     add_paragraph(txt, bold=bold)
@@ -1574,12 +1606,32 @@ def exportar_docx():
                     process_node(child)
                 return
 
+        def process_assinatura(node):
+            """Trata o bloco de assinatura final: cidade/data à direita,
+            nome do analista e NATURATINS centralizados."""
+            paragraphs = node.find_all("p")
+            for i, p in enumerate(paragraphs):
+                txt = clean_text(p)
+                if not txt:
+                    continue
+                if i == 0:
+                    # "Palmas - TO, dd/mm/aaaa" — alinhado à direita
+                    add_paragraph(txt, bold=False, size=10, align="right", space_after=24)
+                else:
+                    # Nome do analista e "NATURATINS – ..." — centralizados
+                    bold = p.find("strong") is not None
+                    add_paragraph(txt, bold=bold, size=10.5, align="center", space_after=2)
+
         for el in soup.select("#barra-usuario, nav, header, footer"):
             el.decompose()
 
         body = soup.find("body") or soup
         for child in body.find_all(recursive=False):
-            process_node(child)
+            classes = child.get("class", []) if hasattr(child, "get") else []
+            if "assinatura" in classes:
+                process_assinatura(child)
+            else:
+                process_node(child)
 
         buf = _io.BytesIO()
         doc.save(buf)
