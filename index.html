@@ -840,7 +840,7 @@
     </div>
 
     <div class="form-group">
-        <label>4. Imóvel sobreposto a Unidade de Conservação (UC)?</label>
+        <label>2. Imóvel sobreposto a Unidade de Conservação (UC)?</label>
         <select id="tem_uc" onchange="toggleShow('div_opcoes_uc', this.value==='Sim')">
             <option value="Não">Não</option><option value="Sim">Sim</option>
         </select>
@@ -865,7 +865,7 @@
     </div>
 
     <div class="form-group">
-        <label>5. Imóvel sobreposto a Área Quilombola?</label>
+        <label>3. Imóvel sobreposto a Área Quilombola?</label>
         <select id="tem_quilombola" onchange="toggleShow('div_opcoes_quilombola', this.value==='Sim')">
             <option value="Não">Não</option><option value="Sim">Sim</option>
         </select>
@@ -885,17 +885,21 @@
     </div>
 
     <div class="form-group">
-        <label>6. Reserva Legal em conformidade com o Código Florestal?</label>
-        <select id="q10"><option value="SIM">SIM</option><option value="NÃO">NÃO</option></select>
+        <label>4. Reserva Legal em conformidade com o Código Florestal?</label>
+        <select id="q10">
+            <option value="SIM">SIM — atende ao Art. 14 (área suficiente)</option>
+            <option value="SIM_ART15">SIM — atende ao Art. 15 (cômputo com APP)</option>
+            <option value="NÃO">NÃO — área insuficiente</option>
+        </select>
     </div>
 
     <div class="grid-2">
         <div class="form-group">
-            <label>7. Desmatamento mecanizado com destoca?</label>
+            <label>5. Desmatamento mecanizado com destoca?</label>
             <select id="q13"><option value="SIM">SIM</option><option value="NÃO">NÃO</option></select>
         </div>
         <div class="form-group">
-            <label>7.1. Tipo de supressão:</label>
+            <label>5.1. Tipo de supressão:</label>
             <select id="q13_1">
                 <option value="ACAIO">ACAIO</option><option value="ACAIM">ACAIM</option>
                 <option value="AEF">AEF</option><option value="AEFS">AEFS</option>
@@ -904,17 +908,21 @@
     </div>
 
     <div class="form-group">
-        <label>8. Supressão de espécies protegidas por Lei?</label>
+        <label>6. Supressão de espécies protegidas por Lei?</label>
         <select id="q14"><option value="NÃO">NÃO</option><option value="SIM – Com supressão">SIM</option></select>
     </div>
 
     <div class="form-group">
-        <label>9. Amostras do inventário suficientes?</label>
-        <select id="q15"><option value="SIM">SIM</option><option value="NÃO">NÃO</option></select>
+        <label>7. Amostras do inventário suficientes?</label>
+        <select id="q15">
+            <option value="SIM">SIM</option>
+            <option value="NÃO">NÃO</option>
+            <option value="Não se aplica">Não se aplica (Censo / Estratificado)</option>
+        </select>
     </div>
 
     <div class="form-group">
-        <label>10. Vistoria técnica presencial realizada?</label>
+        <label>8. Vistoria técnica presencial realizada?</label>
         <select id="q16" onchange="toggle('q16_extra', this.value==='SIM')">
             <option value="NÃO">NÃO – Dispensada (ARD &lt; 4 módulos fiscais)</option>
             <option value="SIM">SIM</option>
@@ -1038,7 +1046,7 @@
         <label>12. Conclusão Final do Parecer:</label>
         <select id="q17" onchange="toggle('q17_motivo', this.value==='DESFAVORAVELMENTE')"><option value="FAVORAVELMENTE">FAVORÁVEL</option><option value="DESFAVORAVELMENTE">DESFAVORÁVEL</option></select>
         <div id="q17_motivo" class="hidden conditional" style="border-left-color:#c62828;">
-            <label style="color:#c62828;">Descreva o(s) motivo(s) do parecer desfavorável:</label>
+            <label style="color:#c62828;">Descreva as pendências:</label>
             <div id="pend-lista" style="border:1px solid #c62828;border-radius:5px;padding:6px 8px;background:#fff;min-height:80px;"></div>
             <small style="color:#c62828;font-weight:600;">&#8629; Enter para nova pendência numerada &nbsp;|&nbsp; Backspace na linha vazia para remover</small>
         </div>
@@ -1050,7 +1058,10 @@
     </div>
     
 
-    <button class="btn-gerar" onclick="gerarParecer()">📄 Gerar Parecer para Impressão</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn-gerar" style="flex:1;" onclick="gerarParecer()">📄 Gerar Parecer para Impressão</button>
+        <button class="btn-gerar" style="flex:0 0 auto;background:#b71c1c;" onclick="novoProcesso()">🆕 Novo Processo</button>
+    </div>
 </div>
 
 <!-- ============================================================ -->
@@ -1059,6 +1070,36 @@
 <div id="pdf-content"></div>
 
 <script>
+function novoProcesso(){
+    if (!confirm('Isso vai limpar todos os campos do formulário para iniciar um novo processo. Deseja continuar?')) return;
+
+    // Limpa todos os inputs de texto, número e data
+    document.querySelectorAll('#form-container input[type="text"], #form-container input[type="number"], #form-container input[type="date"], #form-container input[type="file"]')
+        .forEach(inp => { inp.value = ''; });
+
+    // Reseta todos os selects para a primeira opção
+    document.querySelectorAll('#form-container select').forEach(sel => { sel.selectedIndex = 0; });
+
+    // Limpa a lista de pendências
+    const pendLista = document.getElementById('pend-lista');
+    if (pendLista) pendLista.innerHTML = '';
+
+    // Oculta blocos condicionais
+    document.querySelectorAll('.conditional').forEach(el => el.classList.add('hidden'));
+
+    // Limpa campos de certidão
+    ['cert_matricula','cert_area','cert_averbacao_rl'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const certResultado = document.getElementById('certidoes-resultado');
+    if (certResultado) { certResultado.style.display = 'none'; }
+    const certLista = document.getElementById('certidoes-lista');
+    if (certLista) certLista.innerHTML = '';
+
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
 // ─── Helpers ───────────────────────────────────────────────────
 function v(id){ return (document.getElementById(id)||{}).value||''; }
 function n(id){ return parseFloat(v(id))||0; }
@@ -1087,8 +1128,23 @@ function addPendItem(lista, num, texto){
     const inp = document.createElement('input');
     inp.type = 'text';
     inp.value = texto;
+    inp.maxLength = 1000;
     inp.style.cssText = 'flex:1;padding:6px 8px;border:1px solid #e0a0a0;border-radius:4px;font-size:13.5px;';
     inp.placeholder = 'Descreva a pendência ' + num + '...';
+
+    // Ao colar texto (ex: do Word), remove formatação e numeração duplicada
+    inp.addEventListener('paste', function(e){
+        e.preventDefault();
+        let texto = (e.clipboardData || window.clipboardData).getData('text/plain');
+        // Remove numeração inicial tipo "1.", "1)", "1 -", "01." etc
+        texto = texto.replace(/^\s*\d+\s*[.\-\)]\s*/, '').trim();
+        // Insere no ponto do cursor, respeitando o limite de 1000 chars
+        const start = inp.selectionStart, end = inp.selectionEnd;
+        const novoValor = inp.value.slice(0, start) + texto + inp.value.slice(end);
+        inp.value = novoValor.slice(0, 1000);
+        const novaPos = Math.min(start + texto.length, 1000);
+        inp.setSelectionRange(novaPos, novaPos);
+    });
 
     inp.addEventListener('keydown', function(e){
         if(e.key === 'Enter'){
@@ -1479,11 +1535,11 @@ function gerarParecer(){
             <p>- Processo de Amostragem: <strong>CENSO FLORESTAL</strong>;</p>
             ` : `
             <p>- Processo de Amostragem: <strong>${invAmostr}</strong>;</p>
-            <p>- Quantidade de Amostras Exigidas: <strong>${invQExig} amostras</strong>;</p>
-            <p>- Quantidade de Amostras Lançadas: <strong>${invQLanc} amostras – ${amostSuf==='SIM'?'suficiente':'insuficiente'}</strong>;</p>
+            <p>- Quantidade de Amostras Exigidas: <strong>${/ESTRATIFICADA/i.test(invAmostr) ? 'Não se aplica' : invQExig + ' amostras'}</strong>;</p>
+            <p>- Quantidade de Amostras Lançadas: <strong>${invQLanc} amostras – ${amostSuf==='SIM'?'suficiente':(amostSuf==='Não se aplica'?'não se aplica':'insuficiente')}</strong>;</p>
             <p>- Tamanho das Amostras: <strong>${invTam}</strong>;</p>
             <p>- Área amostrada: <strong>${fmt(invAreaAm)} ha</strong>;</p>
-            <p>- Intensidade Amostral Necessária: <strong>${invIntNec.toFixed(2).replace('.',',')}%</strong>;</p>
+            <p>- Intensidade Amostral Necessária: <strong>${/ESTRATIFICADA/i.test(invAmostr) ? 'Não se aplica' : invIntNec.toFixed(2).replace('.',',')+'%'}</strong>;</p>
             <p>- Intensidade Amostral Realizada: <strong>${invIntReal.toFixed(2).replace('.',',')}%</strong>;</p>
             <p>- Coeficiente de Variação: <strong>± ${invCV.toFixed(2).replace('.',',')} %</strong>;</p>
             <p>- Volume por Hectare: <strong>${fmt(invVolHa)} m³/ha</strong>;</p>
