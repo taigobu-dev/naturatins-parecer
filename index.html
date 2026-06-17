@@ -277,6 +277,7 @@
             @page { size: A4; margin: 15mm 20mm 20mm 20mm; }
             body { background: white; padding: 0; margin: 0; color: #000; }
             #form-container { display: none; }
+            #btn-exportar-word { display: none !important; }
             #pdf-content { display: block; font-family: Arial, sans-serif; font-size: 9.5pt; color: #000; }
 
             .doc-header { text-align: center; margin-bottom: 14pt; }
@@ -3502,6 +3503,64 @@ function lerQuadroResumo(rows) {
     : null;
 }
 
+/**
+ * Lê o formato "Quadro Resumo Pecuária": colunas TORA(m³)/ESTACA(m³)/LENHA(m³)/LENHA(st)
+ * com duas tabelas lado a lado (espécies comuns + espécies imunes ao corte),
+ * cada uma terminando em uma linha "TOTAL".
+ */
+function lerQuadroResumoPecuaria(rows) {
+  // Encontra o cabeçalho: linha que contém "TORA" e "LENHA" e ("FUSTE" ou "(m³)")
+  let iHdr = -1, headerCols = null;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] || [];
+    const txt = row.map(v => str(v).toUpperCase()).join(' ');
+    if (/TORA/.test(txt) && /LENHA/.test(txt) && /(FUSTE|M[³3])/.test(txt)) {
+      iHdr = i;
+      break;
+    }
+  }
+  if (iHdr < 0) return null;
+
+  // Mapeia colunas pelo cabeçalho (pode ter 2 blocos: esquerda e direita)
+  const hdr = rows[iHdr] || [];
+  const blocos = []; // cada bloco: {colEspecie, colTora, colEstaca, colLenhaM3, colLenhaSt}
+  let atual = null;
+  hdr.forEach((v, i) => {
+    const s = str(v).toUpperCase();
+    if (/ESP[ÉE]CIE/.test(s)) {
+      atual = { colEspecie: i, colTora: -1, colEstaca: -1, colLenhaM3: -1, colLenhaSt: -1 };
+      blocos.push(atual);
+    } else if (atual) {
+      if (/TORA/.test(s))                                   atual.colTora    = i;
+      else if (/ESTACA/.test(s))                             atual.colEstaca  = i;
+      else if (/LENHA/.test(s) && /\(\s*ST\s*\)/.test(s))    atual.colLenhaSt = i;
+      else if (/LENHA/.test(s))                              atual.colLenhaM3 = i;
+    }
+  });
+  if (blocos.length === 0) return null;
+
+  let lenha_m3 = 0, lenha_st = 0, tora_m3 = 0;
+  // Para cada bloco, soma até encontrar a linha "TOTAL" daquele bloco
+  for (const bloco of blocos) {
+    let parou = false;
+    for (let i = iHdr + 1; i < rows.length && !parou; i++) {
+      const row = rows[i] || [];
+      const lblEsp = str(row[bloco.colEspecie]).toUpperCase().trim();
+      if (/^TOTAL$/.test(lblEsp)) {
+        // Usa o próprio valor da linha TOTAL (mais confiável que somar)
+        if (bloco.colLenhaM3 >= 0) lenha_m3 += num(row[bloco.colLenhaM3]) || 0;
+        if (bloco.colLenhaSt >= 0) lenha_st += num(row[bloco.colLenhaSt]) || 0;
+        if (bloco.colTora    >= 0) tora_m3  += num(row[bloco.colTora])    || 0;
+        parou = true;
+      }
+    }
+  }
+
+  if (lenha_m3 <= 0 && lenha_st <= 0) return null;
+  if (!lenha_st) lenha_st = +(lenha_m3 * 1.5).toFixed(4);
+  return _vol(lenha_m3, lenha_st, 0, tora_m3);
+}
+
 function _vol(m3, st, lap, tora) {
   return {
     vol_lenha_m3: +m3.toFixed(4),
@@ -3848,6 +3907,13 @@ function lerVolumesPlano(wb) {
   if (abaQR) {
     const v = lerQuadroResumo(toRows(wb.Sheets[abaQR]));
     if (v && v.vol_lenha_m3 > 0) return v;
+  }
+
+  // ── QUADRO RESUMO PECUÁRIA (TORA/ESTACA/LENHA m³+st, comum+imune) ──
+  const abaQRP = S.find(n => /QUADRO RESUMO/i.test(n));
+  if (abaQRP) {
+    const v = lerQuadroResumoPecuaria(toRows(wb.Sheets[abaQRP]));
+    if (v && (v.vol_lenha_m3 > 0 || v.vol_tora_m3 > 0)) return v;
   }
 
   return ZERO;

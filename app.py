@@ -1526,13 +1526,15 @@ def exportar_docx():
                 return
 
             if tag in ("h1", "h2", "h3") or "section-title" in classes:
-                txt = node.get_text(strip=True)
+                txt = node.get_text(separator=" ", strip=True)
+                txt = re.sub(r"\s+", " ", txt)
                 if txt:
                     add_paragraph(txt, bold=True, size=13, color=(15, 76, 30))
                 return
 
             if "sub-section" in classes:
-                txt = node.get_text(strip=True)
+                txt = node.get_text(separator=" ", strip=True)
+                txt = re.sub(r"\s+", " ", txt)
                 if txt:
                     add_paragraph(txt, bold=True, size=11.5)
                 return
@@ -1549,7 +1551,8 @@ def exportar_docx():
                     row_cells = table.add_row().cells
                     for i, c in enumerate(cells):
                         if i < ncols:
-                            row_cells[i].text = c.get_text(strip=True)
+                            cell_txt = c.get_text(separator=" ", strip=True)
+                            row_cells[i].text = re.sub(r"\s+", " ", cell_txt)
                             for p in row_cells[i].paragraphs:
                                 for run in p.runs:
                                     run.font.size = Pt(9.5)
@@ -1559,7 +1562,8 @@ def exportar_docx():
                 return
 
             if tag in ("p", "li"):
-                txt = node.get_text(strip=True)
+                txt = node.get_text(separator=" ", strip=True)
+                txt = re.sub(r"\s+", " ", txt)
                 if txt:
                     bold = node.find("strong") is not None and len(txt) < 200
                     add_paragraph(txt, bold=bold)
