@@ -1370,12 +1370,18 @@ function gerarParecer(){
         ? `<tr><td>Volume Total em TORA</td><td><strong>${fmt(volToraM3)}</strong></td><td>-</td></tr>`
         : `<tr><td>Volume Total em TORA</td><td><strong>-</strong></td><td>-</td></tr>`;
 
-    // Pendências automáticas do checklist (NÃO / PARCIAL)
+    // Pendências automáticas do checklist (NÃO / PARCIAL) — prefixo SIGAM/SINAFLOR
     const pendAutoItens = docPends.length > 0
-        ? docPends.map(p => `${p.label}${p.status==='PARCIAL'?' <em>(PARCIAL)</em>':''}: ${p.desc||'Documentação pendente/incompleta.'}`)
+        ? docPends.map(p => `SIGAM/SINAFLOR: ${p.label}${p.status==='PARCIAL'?' <em>(PARCIAL)</em>':''}: ${p.desc||'Documentação pendente/incompleta.'}`)
         : [];
+    // Pendências manuais (análise técnica) — prefixo SIGAM/SINAFLOR, exceto se já tiver outro prefixo de sistema
+    // Cada linha já vem como "N. texto" (numerado por getPendTexto); extraímos o texto puro
     const pendManualItens = motivoDesfav
-        ? motivoDesfav.split('\n').map(l=>l.trim()).filter(Boolean)
+        ? motivoDesfav.split('\n').map(l=>l.trim()).filter(Boolean).map(l => {
+            const semNumero = l.replace(/^\s*\d+\s*[.\-\)]\s*/, '').trim();
+            const jaTemPrefixo = /^(SIGAM\/SINAFLOR|SIGAM|SINAFLOR|SIG-CAR|SIGCAR)\s*:/i.test(semNumero);
+            return jaTemPrefixo ? semNumero : `SIGAM/SINAFLOR: ${semNumero}`;
+          })
         : [];
     // Junta tudo e numera sequencialmente
     const todasPendItens = [...pendAutoItens, ...pendManualItens];
@@ -1616,8 +1622,8 @@ function gerarParecer(){
     <div class="section-title">CONCLUSÃO</div>
     <div class="section-body">
         <div class="conclusao-box" style="page-break-inside:auto;">
-            <p>Pelo exposto, conclui-se <strong>${conclusao}</strong> ao deferimento do pleito.</p>
             ${todasPendHtml ? `<div class="pend-box"><div class="pend-title">PENDÊNCIA(S)/MOTIVO(S):</div>${todasPendHtml}</div>` : ''}
+            <p>Pelo exposto, conclui-se <strong>${conclusao}</strong> ao deferimento do pleito.</p>
             <p>Recomenda-se que, a expedição dos atos administrativos correspondentes às atividades ora requeridas, a saber:</p>
             <p><strong>1 – Autorização de ${tipoSupr}</strong> para a supressão de <strong>${fmt(aARD)} hectares</strong>, apresentando o seguinte rendimento e destinação do material lenhoso:</p>
             <ul class="bullet-list">
