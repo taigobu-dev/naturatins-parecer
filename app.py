@@ -1448,6 +1448,153 @@ Se algum dado não for encontrado use string vazia "". Responda APENAS com o JSO
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  EXPORTAR PARECER PARA WORD (.DOCX)
+# ═══════════════════════════════════════════════════════════════════
+
+@app.route("/api/exportar-docx", methods=["POST", "OPTIONS"])
+def exportar_docx():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not token:
+        return jsonify({"erro": "Não autenticado."}), 401
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        usuario = db.session.get(Usuario, payload.get("sub"))
+        if not usuario or not usuario.ativo:
+            return jsonify({"erro": "Sessão inválida."}), 401
+    except Exception:
+        return jsonify({"erro": "Token inválido."}), 401
+
+    try:
+        from docx import Document
+        from docx.shared import Pt, Inches, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from bs4 import BeautifulSoup as BS
+        import io as _io
+
+        dados = request.get_json(force=True)
+        html_content = dados.get("html", "")
+        nome_arquivo = dados.get("nome_arquivo", "parecer")
+
+        if not html_content:
+            return jsonify({"erro": "HTML do parecer não enviado."}), 400
+
+        soup = BS(html_content, "html.parser")
+        doc = Document()
+
+        for section in doc.sections:
+            section.left_margin = Inches(0.9)
+            section.right_margin = Inches(0.9)
+            section.top_margin = Inches(0.8)
+            section.bottom_margin = Inches(0.8)
+        style = doc.styles["Normal"]
+        style.font.name = "Arial"
+        style.font.size = Pt(10.5)
+
+        def add_paragraph(text, bold=False, size=10.5, align=None, color=None, italic=False):
+            p = doc.add_paragraph()
+            if align == "center":
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(text)
+            run.bold = bold
+            run.italic = italic
+            run.font.size = Pt(size)
+            run.font.name = "Arial"
+            if color:
+                run.font.color.rgb = RGBColor(*color)
+            return p
+
+        def process_node(node):
+            tag = getattr(node, "name", None)
+            if tag is None:
+                return
+            classes = node.get("class", []) if hasattr(node, "get") else []
+
+            if tag == "img":
+                src = node.get("src", "")
+                if src.startswith("data:image"):
+                    try:
+                        _, b64data = src.split(",", 1)
+                        img_bytes = base64.b64decode(b64data)
+                        img_stream = _io.BytesIO(img_bytes)
+                        doc.add_picture(img_stream, width=Inches(5.5))
+                        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    except Exception as e:
+                        log.warning("Erro ao inserir imagem no docx: %s", e)
+                return
+
+            if tag in ("h1", "h2", "h3") or "section-title" in classes:
+                txt = node.get_text(strip=True)
+                if txt:
+                    add_paragraph(txt, bold=True, size=13, color=(15, 76, 30))
+                return
+
+            if "sub-section" in classes:
+                txt = node.get_text(strip=True)
+                if txt:
+                    add_paragraph(txt, bold=True, size=11.5)
+                return
+
+            if tag == "table":
+                rows = node.find_all("tr")
+                if not rows:
+                    return
+                ncols = max(len(r.find_all(["td", "th"])) for r in rows)
+                table = doc.add_table(rows=0, cols=ncols)
+                table.style = "Table Grid"
+                for r in rows:
+                    cells = r.find_all(["td", "th"])
+                    row_cells = table.add_row().cells
+                    for i, c in enumerate(cells):
+                        if i < ncols:
+                            row_cells[i].text = c.get_text(strip=True)
+                            for p in row_cells[i].paragraphs:
+                                for run in p.runs:
+                                    run.font.size = Pt(9.5)
+                                    run.font.name = "Arial"
+                                    if c.name == "th":
+                                        run.bold = True
+                return
+
+            if tag in ("p", "li"):
+                txt = node.get_text(strip=True)
+                if txt:
+                    bold = node.find("strong") is not None and len(txt) < 200
+                    add_paragraph(txt, bold=bold)
+                return
+
+            if tag in ("div", "ul", "body", "html"):
+                for child in node.find_all(recursive=False):
+                    process_node(child)
+                return
+
+        for el in soup.select("#barra-usuario, nav, header, footer"):
+            el.decompose()
+
+        body = soup.find("body") or soup
+        for child in body.find_all(recursive=False):
+            process_node(child)
+
+        buf = _io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+
+        from flask import send_file
+        return send_file(
+            buf,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            as_attachment=True,
+            download_name=f"{nome_arquivo}.docx",
+        )
+
+    except Exception as exc:
+        log.error("Erro ao exportar docx: %s", exc, exc_info=True)
+        return jsonify({"erro": f"Erro ao gerar Word: {exc}"}), 500
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════
 

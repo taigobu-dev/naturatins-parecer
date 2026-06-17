@@ -1097,6 +1097,15 @@ function novoProcesso(){
     const certLista = document.getElementById('certidoes-lista');
     if (certLista) certLista.innerHTML = '';
 
+    // Limpa imagens do parecer
+    parecerImagens = [];
+    renderizarImagensPreview();
+
+    // Oculta botão de exportar Word
+    const btnWord = document.getElementById('btn-exportar-word');
+    if (btnWord) btnWord.style.display = 'none';
+    window._ultimoParecerHtml = null;
+
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
@@ -1631,6 +1640,8 @@ function gerarParecer(){
 `;
 
     document.getElementById('pdf-content').innerHTML = html;
+    window._ultimoParecerHtml = html;
+    window._ultimoParecerNumero = numParecer;
     // Oculta a barra do usuário antes de imprimir
     const barra = document.getElementById('barra-usuario');
     if (barra) barra.style.display = 'none';
@@ -1646,6 +1657,60 @@ function gerarParecer(){
     window.print();
     // Restaura a barra do usuário após imprimir
     if (barra) barra.style.display = '';
+    // Mostra botão flutuante de exportar para Word
+    mostrarBotaoExportarWord();
+}
+
+function mostrarBotaoExportarWord(){
+    let btn = document.getElementById('btn-exportar-word');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'btn-exportar-word';
+        btn.innerHTML = '📝 Exportar para Word';
+        btn.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;background:#2b579a;color:white;border:none;padding:14px 22px;border-radius:30px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.25);';
+        btn.onclick = exportarParecerWord;
+        document.body.appendChild(btn);
+    }
+    btn.style.display = 'block';
+}
+
+async function exportarParecerWord(){
+    const btn = document.getElementById('btn-exportar-word');
+    const textoOriginal = btn.innerHTML;
+    btn.innerHTML = '⏳ Gerando...';
+    btn.disabled = true;
+
+    try {
+        const htmlCompleto = '<html><body>' + window._ultimoParecerHtml + '</body></html>';
+        const nomeArquivo = 'parecer_' + (window._ultimoParecerNumero || 'tecnico').replace(/[^\w\-]/g, '_');
+
+        const r = await fetch(API_BASE + '/api/exportar-docx', {
+            method: 'POST',
+            headers: Session.headers(),
+            body: JSON.stringify({ html: htmlCompleto, nome_arquivo: nomeArquivo }),
+        });
+
+        if (!r.ok) {
+            const erro = await r.json().catch(()=>({erro:'Erro desconhecido'}));
+            throw new Error(erro.erro || 'Erro ao gerar o Word.');
+        }
+
+        const blob = await r.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nomeArquivo + '.docx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+    } catch (e) {
+        alert('❌ ' + e.message);
+    } finally {
+        btn.innerHTML = textoOriginal;
+        btn.disabled = false;
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
