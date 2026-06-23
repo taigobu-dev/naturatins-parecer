@@ -1415,26 +1415,29 @@ Se algum dado não for encontrado use string vazia "". Responda APENAS com o JSO
     try:
         import json as _json
 
-        r = req.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={GEMINI_API_KEY}",
-            headers={"Content-Type": "application/json"},
-            json={
-                "contents": [{"parts": [
-                    {"inline_data": {"mime_type": "application/pdf", "data": pdf_b64}},
-                    {"text": prompt}
-                ]}],
-                "generationConfig": {
-                    "maxOutputTokens": 512,
-                    "temperature": 0,
-                    "thinkingConfig": {"thinkingBudget": 0}
-                }
-            },
-            timeout=60,
-        )
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
+        payload_gemini = {
+            "contents": [{"parts": [
+                {"inline_data": {"mime_type": "application/pdf", "data": pdf_b64}},
+                {"text": prompt}
+            ]}],
+            "generationConfig": {
+                "maxOutputTokens": 512,
+                "temperature": 0,
+                "thinkingConfig": {"thinkingBudget": 0}
+            }
+        }
+
+        r = req.post(url, headers={"Content-Type": "application/json"},
+                     json=payload_gemini, timeout=30)
 
         if r.status_code == 429:
             log.warning("Gemini 429 — rate limit")
             return jsonify({"erro": "RATE_LIMIT"}), 429
+
+        if r.status_code == 503:
+            log.warning("Gemini 503 — servidor temporariamente indisponível")
+            return jsonify({"erro": "SERVIDOR_INDISPONIVEL"}), 503
 
         r.raise_for_status()
         texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
