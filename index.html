@@ -279,6 +279,7 @@
             #form-container { display: none; }
             #btn-exportar-word { display: none !important; }
             #pdf-content { display: block; font-family: Arial, sans-serif; font-size: 9.5pt; color: #000; }
+            body.modo-privacidade .dado-sensivel { filter: blur(6px) !important; -webkit-filter: blur(6px) !important; }
 
             .doc-header { text-align: center; margin-bottom: 14pt; }
             .doc-header .naturatins-logo { font-size: 7.5pt; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 6pt; margin-bottom: 8pt; }
@@ -358,6 +359,20 @@
             #reset-screen,
             .btn-senha-menu,
             nav, header, footer { display: none !important; }
+        }
+        /* ── MODO VÍDEO / PRIVACIDADE ────────────────────────── */
+        body.modo-privacidade .dado-sensivel {
+            filter: blur(6px);
+            -webkit-filter: blur(6px);
+            user-select: none;
+            transition: filter 0.2s;
+        }
+        body.modo-privacidade .dado-sensivel:hover {
+            filter: blur(6px); /* mantém borrado mesmo no hover, sem revelar por acidente */
+        }
+        #btn-modo-privacidade.ativo {
+            background: #c62828 !important;
+            color: #fff !important;
         }
     </style>
 </head>
@@ -460,11 +475,12 @@
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div id="barra-usuario" class="oculto">
   <div>
-    <span class="barra-nome" id="barra-nome-usuario"></span>
+    <span class="barra-nome dado-sensivel" id="barra-nome-usuario"></span>
     <span class="barra-perfil" id="barra-perfil-usuario"></span>
   </div>
   <div>
     <button class="btn-admin oculto" id="btn-painel-admin" onclick="abrirAdmin()">⚙️ Admin</button>
+    <button class="btn-senha-menu" id="btn-modo-privacidade" onclick="toggleModoPrivacidade()" title="Oculta dados sensíveis na tela para gravação de vídeo/print">🙈 Modo Vídeo</button>
     <button class="btn-senha-menu" onclick="abrirTrocarSenha()">🔑 Trocar Senha</button>
     <button class="btn-logout" onclick="fazerLogout()">Sair</button>
   </div>
@@ -591,12 +607,12 @@
 
     <h2>Dados do Processo e Requerente</h2>
     <div class="grid-2">
-        <div class="form-group"><label>Nº do Processo (SIGAM):</label><input type="text" id="num_processo" placeholder="ex: 2025/40311/006805"></div>
+        <div class="form-group"><label>Nº do Processo (SIGAM):</label><input type="text" id="num_processo" class="dado-sensivel" placeholder="ex: 2025/40311/006805"></div>
         <div class="form-group"><label>Nº do Requerimento (SIGAM):</label><input type="text" id="num_requerimento" placeholder="ex: 12454/2025"></div>
         <div class="form-group"><label>Nº do Parecer:</label><input type="text" id="num_parecer" placeholder="ex: 0164-2026"></div>
         <div class="form-group"><label>Data do Parecer:</label><input type="date" id="data_parecer"></div>
-        <div class="form-group"><label>Nome do Requerente:</label><input type="text" id="nome_requerente" placeholder="ex: JOÃO DA SILVA (preenchido pelo CAR)"></div>
-        <div class="form-group"><label>CPF/CNPJ do Requerente:</label><input type="text" id="cpf_requerente" placeholder="ex: 000.000.000-00 (preenchido pelo CAR)"></div>
+        <div class="form-group"><label>Nome do Requerente:</label><input type="text" id="nome_requerente" class="dado-sensivel" placeholder="ex: JOÃO DA SILVA (preenchido pelo CAR)"></div>
+        <div class="form-group"><label>CPF/CNPJ do Requerente:</label><input type="text" id="cpf_requerente" class="dado-sensivel" placeholder="ex: 000.000.000-00 (preenchido pelo CAR)"></div>
         <div class="form-group"><label>Atividade:</label>
             <select id="atividade">
                 <option value="">Selecione...</option>
@@ -610,8 +626,8 @@
                 <option value="Mineração">Mineração</option>
             </select>
         </div>
-        <div class="form-group"><label>Responsável Técnico:</label><input type="text" id="resp_tecnico"></div>
-        <div class="form-group"><label>CPF/CNPJ Resp. Técnico:</label><input type="text" id="cpf_resp_tecnico"></div>
+        <div class="form-group"><label>Responsável Técnico:</label><input type="text" id="resp_tecnico" class="dado-sensivel"></div>
+        <div class="form-group"><label>CPF/CNPJ Resp. Técnico:</label><input type="text" id="cpf_resp_tecnico" class="dado-sensivel"></div>
         <div class="form-group"><label>Título Profissional:</label><input type="text" id="titulo_prof" placeholder="ex: Eng. Agrônomo"></div>
         <div class="form-group"><label>ART / Registro:</label><input type="text" id="art_resp_tecnico" placeholder="ex: TO20250558061"></div>
         <div class="form-group"><label>E-mail Resp. Técnico:</label><input type="text" id="email_resp"></div>
@@ -646,7 +662,7 @@
     <div class="grid-2" style="margin-bottom:16px;">
         <div class="form-group">
             <label>Nº da(s) Matrícula(s):</label>
-            <input type="text" id="cert_matricula" placeholder="Preenchido automaticamente...">
+            <input type="text" id="cert_matricula" class="dado-sensivel" placeholder="Preenchido automaticamente...">
         </div>
         <div class="form-group">
             <label>Área Total da(s) Matrícula(s) (ha):</label>
@@ -665,7 +681,7 @@
     <div class="search-box">
         <label>🔍 Número do CAR para busca automática (SIGCAR):</label>
         <div class="search-row" style="margin-top:8px;">
-            <input type="text" id="q5_num" placeholder="Ex: TO-1234567-...">
+            <input type="text" id="q5_num" class="dado-sensivel" placeholder="Ex: TO-1234567-...">
             <button class="btn-search" onclick="consultarCARBackend()">Buscar CAR</button>
         </div>
         <small id="status_busca" style="color:var(--secondary);"></small>
@@ -1390,7 +1406,7 @@ function gerarParecer(){
         : '';
 
     // NUP e Requerimento
-    const linhaReq = numReq ? `NUP. <strong>${numProcesso}</strong> onde solicita` : `onde solicita`;
+    const linhaReq = numReq ? `NUP. <strong><span class="dado-sensivel">${numProcesso}</span></strong> onde solicita` : `onde solicita`;
 
     const html = `
 <div class="doc-header">
@@ -1407,16 +1423,16 @@ function gerarParecer(){
     <div class="section-title">DADOS GERAIS</div>
     <div class="section-body">
         <table class="dados-table">
-            <tr><td class="lbl">Processo:</td><td>${numProcesso}</td></tr>
-            <tr><td class="lbl">Requerente:</td><td>${requerente}</td></tr>
-            <tr><td class="lbl">CPF/CNPJ:</td><td>${cpfReq}</td></tr>
+            <tr><td class="lbl">Processo:</td><td><span class="dado-sensivel">${numProcesso}</span></td></tr>
+            <tr><td class="lbl">Requerente:</td><td><span class="dado-sensivel">${requerente}</span></td></tr>
+            <tr><td class="lbl">CPF/CNPJ:</td><td><span class="dado-sensivel">${cpfReq}</span></td></tr>
             <tr><td class="lbl">Atividade:</td><td>${atividade}</td></tr>
             <tr><td class="lbl">Município:</td><td>${municipio}</td></tr>
-            <tr><td class="lbl">Responsável Técnico:</td><td>${respTec}</td></tr>
-            <tr><td class="lbl">CPF/CNPJ:</td><td>${cpfResp}</td></tr>
+            <tr><td class="lbl">Responsável Técnico:</td><td><span class="dado-sensivel">${respTec}</span></td></tr>
+            <tr><td class="lbl">CPF/CNPJ:</td><td><span class="dado-sensivel">${cpfResp}</span></td></tr>
             <tr><td class="lbl">Título Profissional:</td><td>${tituloPof} – ART ${artNum}</td></tr>
-            <tr><td class="lbl">E-mail:</td><td>${emailResp}</td></tr>
-            <tr><td class="lbl">Telefone:</td><td>${telResp}</td></tr>
+            <tr><td class="lbl">E-mail:</td><td><span class="dado-sensivel">${emailResp}</span></td></tr>
+            <tr><td class="lbl">Telefone:</td><td><span class="dado-sensivel">${telResp}</span></td></tr>
         </table>
     </div>
 </div>
@@ -1426,7 +1442,7 @@ function gerarParecer(){
     <div class="section-title">ANÁLISE</div>
     <div class="section-body">
         <div class="body-text">
-            <p>O processo em apreço trata-se de requerimento Nº. <strong>${numReq}</strong> ${linhaReq} a <strong>Autorização de ${tipoSupr} – ${tipoSupr}</strong> em uma área de <strong>${fmt(aARD)} hectares</strong> no imóvel denominado <strong>${nomeImovel}</strong>, ${municipio}, com área escriturada de <strong>${fmt(aEsc)} hectares</strong> e <strong>${fmt(aVet)} hectares</strong> vetorizada.</p>
+            <p>O processo em apreço trata-se de requerimento Nº. <strong><span class="dado-sensivel">${numReq}</span></strong> ${linhaReq} a <strong>Autorização de ${tipoSupr} – ${tipoSupr}</strong> em uma área de <strong>${fmt(aARD)} hectares</strong> no imóvel denominado <strong><span class="dado-sensivel">${nomeImovel}</span></strong>, ${municipio}, com área escriturada de <strong>${fmt(aEsc)} hectares</strong> e <strong>${fmt(aVet)} hectares</strong> vetorizada.</p>
             <p><strong>A ANÁLISE DESTE PROCESSO FOI REALIZADA POR MEIO DO SISTEMA INTEGRADO DE GESTÃO AMBIENTAL - SIGAM.</strong></p>
         </div>
 
@@ -1436,7 +1452,7 @@ function gerarParecer(){
             <p>${linhaLicenca}</p>
         </div>
 
-        <div class="sub-section">2. ANÁLISE - CAR/TO nº ${numCAR}</div>
+        <div class="sub-section">2. ANÁLISE - CAR/TO nº <span class="dado-sensivel">${numCAR}</span></div>
         <div class="body-text">
             <p>A análise do CAR foi realizada com base na inscrição <strong>${statusCAR}</strong> no <strong>SIGCAR em ${dataSigcar}</strong>.</p>
             <p>Constatou-se que <strong>${adesaoPRA==='Sim' ? 'houve' : 'não houve'}</strong> adesão ao Programa de Regularização Ambiental (PRA).</p>
@@ -1785,6 +1801,18 @@ async function fazerLogin() {
     } finally {
         loadEl.classList.add('oculto');
         document.querySelector('.btn-login').disabled = false;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MODO VÍDEO / PRIVACIDADE — oculta dados sensíveis na tela
+// ═══════════════════════════════════════════════════════════════
+function toggleModoPrivacidade() {
+    const ativo = document.body.classList.toggle('modo-privacidade');
+    const btn = document.getElementById('btn-modo-privacidade');
+    if (btn) {
+        btn.classList.toggle('ativo', ativo);
+        btn.innerHTML = ativo ? '🙉 Modo Vídeo (ON)' : '🙈 Modo Vídeo';
     }
 }
 
