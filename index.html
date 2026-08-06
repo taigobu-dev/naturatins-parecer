@@ -480,7 +480,7 @@
   </div>
   <div>
     <button class="btn-admin oculto" id="btn-painel-admin" onclick="abrirAdmin()">⚙️ Admin</button>
-    <button class="btn-senha-menu" id="btn-modo-privacidade" onclick="toggleModoPrivacidade()" title="Oculta dados sensíveis na tela para gravação de vídeo/print">🙈 Modo Vídeo</button>
+    <button class="btn-senha-menu oculto" id="btn-modo-privacidade" onclick="toggleModoPrivacidade()" title="Oculta dados sensíveis na tela para gravação de vídeo/print">🙈 Modo Vídeo</button>
     <button class="btn-senha-menu" onclick="abrirTrocarSenha()">🔑 Trocar Senha</button>
     <button class="btn-logout" onclick="fazerLogout()">Sair</button>
   </div>
@@ -1808,6 +1808,7 @@ async function fazerLogin() {
 //  MODO VÍDEO / PRIVACIDADE — oculta dados sensíveis na tela
 // ═══════════════════════════════════════════════════════════════
 function toggleModoPrivacidade() {
+    if (Session.usuario?.perfil !== 'admin') return;
     const ativo = document.body.classList.toggle('modo-privacidade');
     const btn = document.getElementById('btn-modo-privacidade');
     if (btn) {
@@ -1834,6 +1835,7 @@ function ativarSistema(usuario) {
         usuario.perfil === 'admin' ? '(Administrador)' : '(Analista)';
     if (usuario.perfil === 'admin') {
         document.getElementById('btn-painel-admin').classList.remove('oculto');
+        document.getElementById('btn-modo-privacidade').classList.remove('oculto');
     }
     // Preenche automaticamente o campo Analista com o nome do usuário logado
     const campoAnalista = document.getElementById('analista_nome');
