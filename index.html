@@ -3041,7 +3041,7 @@ function gerarRelatorioCampo(){
         return;
     }
 
-    const respostas = (id) => v(id);
+    const respostas = (id) => v(id) || 'Não informado';
 
     const html = `
 <div class="doc-header">

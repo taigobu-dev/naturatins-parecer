@@ -1080,6 +1080,44 @@ def _sigcar_ficha(s: req.Session, url_ficha: str) -> dict:
                 cpf_req  = tds[1].get_text(strip=True) if len(tds) > 1 else ""
                 break
 
+    # Proprietário — tabela de domínio (pessoa jurídica), quando não há PF
+    if not nome_req:
+        tabela_pj = soup.find(id="tabela_ficha_pj")
+        if tabela_pj:
+            tbody = tabela_pj.find("tbody")
+            trs = tbody.find_all("tr") if tbody else tabela_pj.find_all("tr")
+            for tr in trs:
+                tds = tr.find_all("td")
+                if tds and tds[0].get_text(strip=True):
+                    nome_req = tds[0].get_text(strip=True)
+                    cpf_req  = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+                    break
+        if nome_req:
+            log.info("SIGCAR: requerente extraído via tabela_ficha_pj (pessoa jurídica).")
+
+    # Fallback genérico — varre todas as tabelas procurando cabeçalho Nome/Razão Social + CPF/CNPJ
+    if not nome_req:
+        for tabela in soup.find_all("table"):
+            cabecalho_txt = tabela.get_text(" ", strip=True)[:300].upper()
+            if ("NOME" in cabecalho_txt or "RAZÃO SOCIAL" in cabecalho_txt or "RAZAO SOCIAL" in cabecalho_txt) \
+               and ("CPF" in cabecalho_txt or "CNPJ" in cabecalho_txt):
+                tbody = tabela.find("tbody")
+                trs = tbody.find_all("tr") if tbody else tabela.find_all("tr")
+                for tr in trs:
+                    tds = tr.find_all("td")
+                    if tds and tds[0].get_text(strip=True):
+                        candidato = tds[0].get_text(strip=True)
+                        if candidato.upper() not in ("NOME", "RAZÃO SOCIAL", "RAZAO SOCIAL"):
+                            nome_req = candidato
+                            cpf_req  = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+                            break
+                if nome_req:
+                    log.info("SIGCAR: requerente extraído via busca genérica de tabela (fallback).")
+                    break
+
+    if not nome_req:
+        log.warning("SIGCAR: não foi possível localizar o nome do requerente na ficha (%s).", url_ficha)
+
     # Dados de área — JSON embutido: atualizarCalculoAreas(JSON.parse('...'))
     areas = {}
     for script in soup.find_all("script"):
@@ -1220,14 +1258,32 @@ def buscar_sigam():
         # ── Usa proxy local se configurado ──────────────────────────
         if SIGAM_PROXY_URL:
             log.info("SIGAM via proxy: %s", SIGAM_PROXY_URL)
-            r = req.post(
-                f"{SIGAM_PROXY_URL.rstrip('/')}/proxy/sigam",
-                headers={"X-Proxy-Chave": SIGAM_PROXY_CHAVE,
-                         "Content-Type": "application/json"},
-                json={"ano": ano, "orgao": orgao, "sequencial": sequencial},
-                timeout=120,
-            )
-            return jsonify(r.json())
+            try:
+                r = req.post(
+                    f"{SIGAM_PROXY_URL.rstrip('/')}/proxy/sigam",
+                    headers={"X-Proxy-Chave": SIGAM_PROXY_CHAVE,
+                             "Content-Type": "application/json"},
+                    json={"ano": ano, "orgao": orgao, "sequencial": sequencial},
+                    timeout=120,
+                )
+                return jsonify(r.json())
+            except ValueError:
+                # r.json() falhou — proxy respondeu vazio, com erro HTML, ou está fora do ar
+                log.error("SIGAM proxy respondeu conteúdo inválido (status=%s, corpo=%r)",
+                          getattr(r, "status_code", "?"), (r.text[:200] if hasattr(r, "text") else ""))
+                return jsonify({
+                    "sucesso": False,
+                    "mensagem": "Proxy do SIGAM não respondeu corretamente. Verifique se o computador com o "
+                                 "iniciar_proxy.py está ligado e conectado, e se a URL do proxy no Render "
+                                 "ainda está atualizada (o ngrok gratuito muda de endereço a cada reinício)."
+                })
+            except req.exceptions.RequestException as e:
+                log.error("SIGAM proxy inacessível: %s", e)
+                return jsonify({
+                    "sucesso": False,
+                    "mensagem": "Não foi possível conectar ao proxy do SIGAM. Verifique se o iniciar_proxy.py "
+                                 "está rodando e se a URL configurada no Render está correta."
+                })
         # ── Acesso direto (requer IP liberado no SIGAM) ──────────────
 
         s = _sigam_session()
