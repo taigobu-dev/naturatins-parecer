@@ -1199,8 +1199,8 @@
         <div class="form-group"><label>Vistoria Realizada em:</label><input type="date" id="rc_data_vistoria"></div>
         <div class="form-group" style="grid-column:span 2;"><label>Departamento:</label><input type="text" id="rc_departamento" value="Gerência de Controle e Uso dos Recursos Florestais"></div>
     </div>
-    <div class="form-group"><label>Equipe (nome e função de cada integrante):</label>
-        <textarea id="rc_equipe" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;" placeholder="ex: Fulano de Tal – Inspetor de Recursos Naturais; Ciclana – Analista."></textarea>
+    <div class="form-group"><label>Nome da Equipe:</label>
+        <input type="text" id="rc_equipe" placeholder="ex: Fulano de Tal e Ciclana">
     </div>
 
     <div class="form-group">
@@ -1242,7 +1242,13 @@
         <div class="form-group"><label>Tipologia representativa da propriedade?</label>
             <select id="rc_rl_tipologia"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
         </div>
-        <div class="form-group"><label>Tipologia observada:</label><input type="text" id="rc_tipologia_desc" placeholder="ex: Cerrado"></div>
+        <div class="form-group"><label>Tipologia observada:</label>
+            <select id="rc_tipologia_desc">
+                <option value="">Selecione...</option>
+                <option value="Cerrado">Cerrado</option>
+                <option value="Floresta">Floresta</option>
+            </select>
+        </div>
         <div class="form-group"><label>Foi observada alguma alteração na RL?</label>
             <select id="rc_rl_alteracao"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
         </div>
@@ -1263,7 +1269,6 @@
         <div class="form-group"><label>Há necessidade de recomposição de APP?</label>
             <select id="rc_app_recomposicao"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
         </div>
-        <div class="form-group"><label>Relevo:</label><input type="text" id="rc_relevo" placeholder="ex: Plano e Ondulado"></div>
         <div class="form-group"><label>Hidrografia:</label><input type="text" id="rc_hidrografia" placeholder="ex: Perene e Intermitente"></div>
         <div class="form-group"><label>Bacia Hidrográfica:</label><input type="text" id="rc_bacia" placeholder="ex: Rio Araguaia"></div>
         <div class="form-group"><label>Croqui/mapa confere com a realidade de campo?</label>
@@ -1281,7 +1286,14 @@
         <div class="form-group"><label>Tipologia vegetal corresponde à base do IBGE?</label>
             <select id="rc_tipologia_ibge"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
         </div>
-        <div class="form-group"><label>Tipologia IBGE observada:</label><input type="text" id="rc_tipologia_ibge_desc" placeholder="ex: Savana_Cerrado"></div>
+        <div class="form-group"><label>Tipologia IBGE observada:</label>
+            <select id="rc_tipologia_ibge_desc">
+                <option value="">Selecione...</option>
+                <option value="Cerrado">Cerrado</option>
+                <option value="Floresta">Floresta</option>
+                <option value="Cerrado e Floresta">Cerrado e Floresta</option>
+            </select>
+        </div>
     </div>
     <div class="form-group hidden conditional" id="rc_especies_obs_wrap">
         <label>Observações sobre espécies protegidas:</label>
@@ -3092,7 +3104,7 @@ function gerarRelatorioCampo(){
         <table class="dados-table">
             <tr><td class="lbl">Vistoria Realizada em:</td><td>${dataVist}</td></tr>
             <tr><td class="lbl">Departamento:</td><td>${depto}</td></tr>
-            <tr><td class="lbl">Equipe:</td><td>${equipe}</td></tr>
+            <tr><td class="lbl">Nome da Equipe:</td><td>${equipe}</td></tr>
         </table>
         ${coordsProp.length ? `
         <p><strong>Coordenadas UTM da Propriedade:</strong></p>
@@ -3130,7 +3142,6 @@ function gerarRelatorioCampo(){
         <p><strong>Área de Preservação Permanente:</strong></p>
         <p>Foi observada alguma alteração? ${respostas('rc_app_alteracao')}.</p>
         <p>Há necessidade de recomposição? ${respostas('rc_app_recomposicao')}.</p>
-        <p><strong>Relevo:</strong> ${respostas('rc_relevo')}</p>
         <p><strong>Hidrografia:</strong> ${respostas('rc_hidrografia')}</p>
         <p><strong>Bacia Hidrográfica:</strong> ${respostas('rc_bacia')}</p>
         <p>As informações da planta/mapa/croqui correspondem à realidade de campo? ${respostas('rc_croqui_confere')}.</p>
