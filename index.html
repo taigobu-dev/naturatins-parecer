@@ -301,6 +301,7 @@
             @page { size: A4; margin: 15mm 20mm 20mm 20mm; }
             body { background: white; padding: 0; margin: 0; color: #000; }
             #form-container { display: none; }
+            #form-container-campo { display: none; }
             #btn-exportar-word { display: none !important; }
             #pdf-content { display: block; font-family: Arial, sans-serif; font-size: 9.5pt; color: #000; }
             body.modo-privacidade .dado-sensivel { filter: blur(6px) !important; -webkit-filter: blur(6px) !important; }
@@ -1153,7 +1154,6 @@
         <div class="form-group"><label>Processo:</label><input type="text" id="rc_processo" class="dado-sensivel" placeholder="ex: 2025/40311/003256"></div>
         <div class="form-group"><label>Nº do Requerimento (SIGAM):</label><input type="text" id="rc_num_requerimento" placeholder="preenchido pelo SIGAM"></div>
         <div class="form-group"><label>Requerente:</label><input type="text" id="rc_requerente" class="dado-sensivel" placeholder="preenchido pelo CAR/SIGAM"></div>
-        <div class="form-group"><label>CPF/CNPJ:</label><input type="text" id="rc_cpf_requerente" class="dado-sensivel" placeholder="preenchido pelo CAR/SIGAM"></div>
         <div class="form-group"><label>Atividade:</label>
             <select id="rc_atividade">
                 <option value="">Selecione...</option>
@@ -2840,6 +2840,14 @@ async function consultarCARBackend() {
 //  RELATÓRIO DE TRABALHO EM CAMPO
 // ═══════════════════════════════════════════════════════════════
 
+function rcHojeISO(){
+    const hoje = new Date();
+    const yyyy = hoje.getFullYear();
+    const mm   = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dd   = String(hoje.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
 function toggleTelaCampo(){
     const parecer = document.getElementById('form-container');
     const campo   = document.getElementById('form-container-campo');
@@ -2848,6 +2856,10 @@ function toggleTelaCampo(){
     parecer.style.display = indoParaCampo ? 'none' : '';
     campo.style.display   = indoParaCampo ? '' : 'none';
     btn.innerHTML = indoParaCampo ? '📄 Parecer Técnico' : '🌱 Relatório de Campo';
+    if (indoParaCampo) {
+        const campoData = document.getElementById('rc_data_relatorio');
+        if (campoData && !campoData.value) campoData.value = rcHojeISO();
+    }
 }
 
 function toggleCondRC(id, valor){
@@ -2954,7 +2966,6 @@ async function consultarSIGAMBackendCampo() {
             p('rc_cpf_resp_tecnico', d.resp_tecnico_cpf);
             p('rc_art',              d.resp_tecnico_registro);
             if(d.nome_requerente_doc) p('rc_requerente', d.nome_requerente_doc);
-            if(d.cpf_requerente_doc)  p('rc_cpf_requerente', d.cpf_requerente_doc);
             const reqInfo = d.num_requerimento_doc ? ' | Req: '+d.num_requerimento_doc : '';
             const preenchidos=[d.resp_tecnico_nome?'RT':'',d.resp_tecnico_cpf?'CPF':''].filter(Boolean).join(', ');
             st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' '+preenchidos+'.':' ⚠️ RT não localizado.');
@@ -2993,7 +3004,6 @@ async function consultarCARBackendCampo() {
             p('rc_municipio', d.municipio||'');
             p('rc_nome_imovel', d.nome_imovel || d.denominacao_imovel || '');
             p('rc_requerente', d.nome_requerente);
-            p('rc_cpf_requerente', d.cpf_requerente);
             p('rc_area_total', d.area_escriturada || d.area_vetorizada);
             p('rc_area_rl', d.reserva_legal);
             p('rc_area_rl_suplementar', d.suplementar);
@@ -3011,7 +3021,6 @@ function gerarRelatorioCampo(){
     const processo    = v('rc_processo');
     const numReq       = v('rc_num_requerimento');
     const requerente   = v('rc_requerente');
-    const cpfReq       = v('rc_cpf_requerente');
     const atividade    = v('rc_atividade');
     const municipio    = v('rc_municipio');
     const respTec      = v('rc_resp_tecnico');
@@ -3059,7 +3068,6 @@ function gerarRelatorioCampo(){
             <tr><td class="lbl">Processo:</td><td><span class="dado-sensivel">${processo}</span></td></tr>
             <tr><td class="lbl">Nº do Requerimento (SIGAM):</td><td>${numReq}</td></tr>
             <tr><td class="lbl">Requerente:</td><td><span class="dado-sensivel">${requerente}</span></td></tr>
-            <tr><td class="lbl">CPF/CNPJ:</td><td><span class="dado-sensivel">${cpfReq}</span></td></tr>
             <tr><td class="lbl">Atividade:</td><td>${atividade}</td></tr>
             <tr><td class="lbl">Município:</td><td>${municipio}</td></tr>
             <tr><td class="lbl">Responsável Técnico:</td><td><span class="dado-sensivel">${respTec}</span></td></tr>
@@ -3218,6 +3226,7 @@ function novoRelatorioCampo(){
         '1. É extremamente proibida a coleta, a supressão, o transporte, o armazenamento, o manejo, o beneficiamento e a comercialização das espécies protegidas (imunes), sem a autorização do NATURATINS;\n2. Manter as Áreas de Reserva Legal – ARL e Áreas de Preservação Permanente – APP preservadas, livres de roçadas e queimadas.';
     document.getElementById('rc_assinatura1_cargo').value = 'Inspetor de Recursos Naturais\nGerência de Controle e Uso dos Recursos Florestais – GEREF';
     document.getElementById('rc_assinatura2_cargo').value = 'Analista\nGerência de Controle e Uso dos Recursos Florestais – GEREF';
+    document.getElementById('rc_data_relatorio').value = rcHojeISO();
 }
 
 async function registrarParecer(dados) {
