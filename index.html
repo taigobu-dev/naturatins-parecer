@@ -274,6 +274,29 @@
             #pdf-content { display: none; }
         }
 
+        .rc-foto-card {
+            display: flex; gap: 12px; align-items: flex-start;
+            background: #f7f9f7; border: 1px solid #d5ddd5; border-radius: 8px; padding: 10px;
+        }
+        .rc-foto-card img.rc-thumb {
+            width: 130px; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid #ccc; flex-shrink: 0;
+        }
+        .rc-foto-card .rc-foto-campos { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .rc-foto-card textarea {
+            width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px;
+            font-size: 13px; resize: vertical; min-height: 44px;
+        }
+        .rc-foto-card .rc-foto-remover {
+            background: #c62828; color: white; border: none; border-radius: 5px;
+            padding: 5px 10px; font-size: 12px; cursor: pointer; align-self: flex-start;
+        }
+        .rc-coord-row { display: flex; gap: 8px; align-items: center; }
+        .rc-coord-row input { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; }
+        .rc-coord-row button {
+            background: #c62828; color: white; border: none; border-radius: 5px;
+            padding: 6px 10px; font-size: 12px; cursor: pointer; flex-shrink: 0;
+        }
+
         @media print {
             @page { size: A4; margin: 15mm 20mm 20mm 20mm; }
             body { background: white; padding: 0; margin: 0; color: #000; }
@@ -295,6 +318,13 @@
                 padding: 3pt 6pt; text-transform: uppercase; letter-spacing: .5px;
             }
             .section-box .section-body { padding: 5pt 7pt; }
+
+            /* Grid de fotos do Relatório de Trabalho em Campo */
+            .rc-foto-grid { display: table; width: 100%; table-layout: fixed; border-spacing: 8pt; margin-bottom: 10pt; }
+            .rc-foto-row { display: table-row; }
+            .rc-foto-item { display: table-cell; width: 50%; border: 1px solid #ccc; padding: 4pt; vertical-align: top; page-break-inside: avoid; }
+            .rc-foto-item img { width: 100%; height: auto; display: block; }
+            .rc-foto-item .rc-foto-legenda { font-size: 8pt; text-align: center; margin-top: 3pt; color: #333; }
 
             /* Tabela de dados gerais */
             .dados-table { width: 100%; border-collapse: collapse; }
@@ -482,6 +512,7 @@
   <div>
     <button class="btn-admin oculto" id="btn-painel-admin" onclick="abrirAdmin()">⚙️ Admin</button>
     <button class="btn-senha-menu oculto" id="btn-modo-privacidade" onclick="toggleModoPrivacidade()" title="Oculta dados sensíveis na tela para gravação de vídeo/print">🙈 Modo Vídeo</button>
+    <button class="btn-senha-menu" id="btn-toggle-campo" onclick="toggleTelaCampo()">🌱 Relatório de Campo</button>
     <button class="btn-senha-menu" onclick="abrirTrocarSenha()">🔑 Trocar Senha</button>
     <button class="btn-logout" onclick="fazerLogout()">Sair</button>
   </div>
@@ -1079,6 +1110,223 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn-gerar" style="flex:1;" onclick="gerarParecer()">📄 Gerar Parecer para Impressão</button>
         <button class="btn-gerar" style="flex:0 0 auto;background:#b71c1c;" onclick="novoProcesso()">🆕 Novo Processo</button>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!--              RELATÓRIO DE TRABALHO EM CAMPO                -->
+<!-- ============================================================ -->
+<div id="form-container-campo" style="display:none;">
+
+    <div class="logo-header">
+        <div>
+            <h1>🌱 Gerador de Relatório de Trabalho em Campo</h1>
+            <p>Instituto Natureza do Tocantins – NATURATINS</p>
+        </div>
+    </div>
+
+    <!-- SIGAM -->
+    <div class="search-box-sigam">
+        <label>🔍 Buscar Dados do Processo (SIGAM):</label>
+        <div class="search-row" style="margin-top:8px;">
+            <input type="text" id="rc_sigam_ano" placeholder="Ano" style="width:18%;">
+            <input type="text" id="rc_sigam_orgao" placeholder="Órgão" style="width:18%;">
+            <input type="text" id="rc_sigam_seq" placeholder="Nº Sequencial" style="width:36%;">
+            <button class="btn-search-sigam" onclick="consultarSIGAMBackendCampo()">Buscar SIGAM</button>
+        </div>
+        <small id="rc_status_busca_sigam" style="color:#00838f;"></small>
+    </div>
+
+    <div class="search-box">
+        <label>🔍 Número do CAR para busca automática (SIGCAR):</label>
+        <div class="search-row" style="margin-top:8px;">
+            <input type="text" id="rc_num_car" class="dado-sensivel" placeholder="Ex: TO-1234567-...">
+            <button class="btn-search" onclick="consultarCARBackendCampo()">Buscar CAR</button>
+        </div>
+        <small id="rc_status_busca_car" style="color:var(--secondary);"></small>
+    </div>
+
+    <h2>1. Dados Gerais</h2>
+    <div class="grid-2">
+        <div class="form-group"><label>Nº do Relatório:</label><input type="text" id="rc_numero_relatorio" placeholder="ex: 009-2026"></div>
+        <div class="form-group"><label>Data do Relatório:</label><input type="date" id="rc_data_relatorio"></div>
+        <div class="form-group"><label>Processo:</label><input type="text" id="rc_processo" class="dado-sensivel" placeholder="ex: 2025/40311/003256"></div>
+        <div class="form-group"><label>Nº do Requerimento (SIGAM):</label><input type="text" id="rc_num_requerimento" placeholder="preenchido pelo SIGAM"></div>
+        <div class="form-group"><label>Requerente:</label><input type="text" id="rc_requerente" class="dado-sensivel" placeholder="preenchido pelo CAR/SIGAM"></div>
+        <div class="form-group"><label>CPF/CNPJ:</label><input type="text" id="rc_cpf_requerente" class="dado-sensivel" placeholder="preenchido pelo CAR/SIGAM"></div>
+        <div class="form-group"><label>Atividade:</label>
+            <select id="rc_atividade">
+                <option value="">Selecione...</option>
+                <option value="Barramento">Barramento</option>
+                <option value="Pecuária">Pecuária</option>
+                <option value="Agricultura">Agricultura</option>
+                <option value="Silvicultura">Silvicultura</option>
+                <option value="Obras Civis Não Lineares">Obras Civis Não Lineares</option>
+                <option value="Obras Civis Lineares">Obras Civis Lineares</option>
+                <option value="Loteamento">Loteamento</option>
+                <option value="Mineração">Mineração</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Município:</label><input type="text" id="rc_municipio" placeholder="preenchido pelo CAR" readonly></div>
+        <div class="form-group"><label>Responsável Técnico:</label><input type="text" id="rc_resp_tecnico" class="dado-sensivel" placeholder="preenchido pelo SIGAM"></div>
+        <div class="form-group"><label>CPF/CNPJ Resp. Técnico:</label><input type="text" id="rc_cpf_resp_tecnico" class="dado-sensivel" placeholder="preenchido pelo SIGAM"></div>
+        <div class="form-group"><label>ART:</label><input type="text" id="rc_art" placeholder="preenchido pelo SIGAM"></div>
+        <div class="form-group"><label>SIGCAR TO Nº:</label><input type="text" id="rc_sigcar_numero" placeholder="preenchido pela busca do CAR" readonly></div>
+        <div class="form-group"><label>Nome do Imóvel Rural:</label><input type="text" id="rc_nome_imovel" class="dado-sensivel" placeholder="preenchido pelo CAR"></div>
+        <div class="form-group"><label>Ato Administrativo:</label>
+            <select id="rc_ato_administrativo">
+                <option value="">Selecione...</option>
+                <option value="Autorização de Exploração Florestal-AEF">Autorização de Exploração Florestal (AEF)</option>
+                <option value="Autorização de Queima Controlada-AQC">Autorização de Queima Controlada (AQC)</option>
+                <option value="Licenciamento Simplificado-LS">Licenciamento Simplificado (LS)</option>
+                <option value="Validação de Tipologia Florestal">Validação de Tipologia Florestal</option>
+                <option value="Outro">Outro</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:4px;">
+        <div class="form-group"><label>Área Total do Imóvel (ha):</label><input type="text" id="rc_area_total" placeholder="preenchido pelo CAR"></div>
+        <div class="form-group"><label>Área de Reserva Legal (ha):</label><input type="text" id="rc_area_rl" placeholder="preenchido pelo CAR"></div>
+        <div class="form-group"><label>Área de RL Suplementar (ha):</label><input type="text" id="rc_area_rl_suplementar" placeholder="preenchido pelo CAR"></div>
+        <div class="form-group"><label>Área Nativa Remanescente (ha):</label><input type="text" id="rc_area_remanescente" placeholder="preenchido pelo CAR"></div>
+        <div class="form-group"><label>Área da Solicitação (ha):</label><input type="text" id="rc_area_solicitacao" placeholder="ex: 156,7004"></div>
+    </div>
+
+    <h2>2. Dados do Relatório</h2>
+    <div class="grid-3">
+        <div class="form-group"><label>Vistoria Realizada em:</label><input type="date" id="rc_data_vistoria"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Departamento:</label><input type="text" id="rc_departamento" value="Gerência de Controle e Uso dos Recursos Florestais"></div>
+    </div>
+    <div class="form-group"><label>Equipe (nome e função de cada integrante):</label>
+        <textarea id="rc_equipe" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;" placeholder="ex: Fulano de Tal – Inspetor de Recursos Naturais; Ciclana – Analista."></textarea>
+    </div>
+
+    <div class="form-group">
+        <label>Coordenadas UTM da Propriedade:</label>
+        <div id="rc-coords-propriedade" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
+        <button type="button" class="btn-search" style="padding:6px 14px;" onclick="rcAddCoord('propriedade')">+ Adicionar Ponto</button>
+    </div>
+
+    <div class="form-group">
+        <label>Coordenadas UTM da Área Solicitada:</label>
+        <div id="rc-coords-area" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
+        <button type="button" class="btn-search" style="padding:6px 14px;" onclick="rcAddCoord('area')">+ Adicionar Ponto</button>
+    </div>
+
+    <h2>3. Considerações Gerais sobre a Propriedade</h2>
+    <div class="form-group"><label>3.1. Qual a atividade principal do imóvel rural?</label>
+        <input type="text" id="rc_ativ_principal" placeholder="ex: Agricultura de sequeiro.">
+    </div>
+    <div class="grid-2">
+        <div class="form-group"><label>3.2. A atividade possui licenciamento ambiental?</label>
+            <select id="rc_licenciamento" onchange="toggleCondRC('rc_licenciamento_det', this.value)">
+                <option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option>
+            </select>
+        </div>
+        <div class="form-group hidden conditional" id="rc_licenciamento_det"><label>Nº da Licença:</label><input type="text" id="rc_licenciamento_numero" placeholder="ex: LP_1257/2025"></div>
+        <div class="form-group"><label>3.3. Situado em UC ou zona de amortecimento?</label>
+            <select id="rc_uc" onchange="toggleCondRC('rc_uc_det', this.value)">
+                <option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option>
+            </select>
+        </div>
+        <div class="form-group hidden conditional" id="rc_uc_det"><label>Qual?</label><input type="text" id="rc_uc_qual" placeholder="ex: Estação Ecológica da Serra Geral do Tocantins"></div>
+        <div class="form-group"><label>3.4. Situado em área indígena/quilombola?</label>
+            <select id="rc_indigena"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+    </div>
+
+    <h2>4. Considerações sobre a Área Solicitada</h2>
+    <div class="grid-2">
+        <div class="form-group"><label>Tipologia representativa da propriedade?</label>
+            <select id="rc_rl_tipologia"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Tipologia observada:</label><input type="text" id="rc_tipologia_desc" placeholder="ex: Cerrado"></div>
+        <div class="form-group"><label>Foi observada alguma alteração na RL?</label>
+            <select id="rc_rl_alteracao"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>RL atende o art. 14 da Lei 12.651?</label>
+            <select id="rc_rl_art14"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option><option value="Não se aplica">Não se aplica</option></select>
+        </div>
+        <div class="form-group"><label>Possui reserva legal suplementar?</label>
+            <select id="rc_rl_suplementar"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Espécies proibidas de corte observadas?</label>
+            <select id="rc_especies_proibidas" onchange="toggleCondRC('rc_especies_obs_wrap', this.value)">
+                <option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Foi observada alteração na APP?</label>
+            <select id="rc_app_alteracao"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Há necessidade de recomposição de APP?</label>
+            <select id="rc_app_recomposicao"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Relevo:</label><input type="text" id="rc_relevo" placeholder="ex: Plano e Ondulado"></div>
+        <div class="form-group"><label>Hidrografia:</label><input type="text" id="rc_hidrografia" placeholder="ex: Perene e Intermitente"></div>
+        <div class="form-group"><label>Bacia Hidrográfica:</label><input type="text" id="rc_bacia" placeholder="ex: Rio Araguaia"></div>
+        <div class="form-group"><label>Croqui/mapa confere com a realidade de campo?</label>
+            <select id="rc_croqui_confere"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Existe área subutilizada?</label>
+            <select id="rc_area_subutilizada"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Unidades de amostra localizadas (quando for o caso)?</label>
+            <select id="rc_amostras_localizadas"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option><option value="Não se aplica">Não se aplica</option></select>
+        </div>
+        <div class="form-group"><label>Espécies florestais citadas correspondem à vistoria?</label>
+            <select id="rc_especies_correspondem"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Tipologia vegetal corresponde à base do IBGE?</label>
+            <select id="rc_tipologia_ibge"><option value="">Selecione...</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+        </div>
+        <div class="form-group"><label>Tipologia IBGE observada:</label><input type="text" id="rc_tipologia_ibge_desc" placeholder="ex: Savana_Cerrado"></div>
+    </div>
+    <div class="form-group hidden conditional" id="rc_especies_obs_wrap">
+        <label>Observações sobre espécies protegidas:</label>
+        <textarea id="rc_especies_obs" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;"></textarea>
+    </div>
+
+    <h2>5. Material Fotográfico</h2>
+    <div class="search-box-sigam">
+        <label>📷 Adicionar fotos da vistoria (pode selecionar várias de uma vez):</label>
+        <div class="search-row" style="margin-top:8px;">
+            <input type="file" id="rc_input_fotos" accept="image/*" multiple
+                   style="flex:1;min-width:200px;padding:7px;border:1.5px solid #b0bec5;border-radius:6px;font-size:13px;"
+                   onchange="rcAdicionarFotos(this)">
+        </div>
+        <small style="color:#607d8b;">Cada foto ganha um campo próprio de descrição, preenchido antes de gerar o relatório.</small>
+    </div>
+    <div id="rc-fotos-lista" style="display:flex;flex-direction:column;gap:14px;margin-top:12px;"></div>
+
+    <h2>6. Finalização</h2>
+    <div class="form-group"><label>Recomendações:</label>
+        <textarea id="rc_recomendacoes" rows="4" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;">1. É extremamente proibida a coleta, a supressão, o transporte, o armazenamento, o manejo, o beneficiamento e a comercialização das espécies protegidas (imunes), sem a autorização do NATURATINS;
+2. Manter as Áreas de Reserva Legal – ARL e Áreas de Preservação Permanente – APP preservadas, livres de roçadas e queimadas.</textarea>
+    </div>
+    <div class="form-group"><label>Observações:</label>
+        <textarea id="rc_observacoes" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;" placeholder="Sem observações."></textarea>
+    </div>
+    <div class="grid-2">
+        <div class="form-group"><label>Parecer Conclusivo:</label>
+            <select id="rc_conclusivo"><option value="">Selecione...</option><option value="FAVORÁVEL">Favorável</option><option value="DESFAVORÁVEL">Desfavorável</option></select>
+        </div>
+        <div class="form-group"><label>Encaminhamento:</label><input type="text" id="rc_encaminhamento" placeholder="ex: Reanálise e emissão do ato após o cumprimento das pendências do processo."></div>
+    </div>
+
+    <h2>Assinaturas</h2>
+    <div class="grid-2">
+        <div class="form-group"><label>1ª Assinatura — Nome:</label><input type="text" id="rc_assinatura1_nome" class="dado-sensivel"></div>
+        <div class="form-group"><label>1ª Assinatura — Cargo/Setor (uma linha por campo):</label><textarea id="rc_assinatura1_cargo" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;" placeholder="Inspetor de Recursos Naturais&#10;Gerência de Controle e Uso dos Recursos Florestais – GEREF">Inspetor de Recursos Naturais
+Gerência de Controle e Uso dos Recursos Florestais – GEREF</textarea></div>
+        <div class="form-group"><label>2ª Assinatura — Nome:</label><input type="text" id="rc_assinatura2_nome" class="dado-sensivel"></div>
+        <div class="form-group"><label>2ª Assinatura — Cargo/Setor (uma linha por campo):</label><textarea id="rc_assinatura2_cargo" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;">Analista
+Gerência de Controle e Uso dos Recursos Florestais – GEREF</textarea></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+        <button class="btn-gerar" style="flex:1;" onclick="gerarRelatorioCampo()">📄 Gerar Relatório de Campo para Impressão</button>
+        <button class="btn-gerar" style="flex:0 0 auto;background:#b71c1c;" onclick="novoRelatorioCampo()">🆕 Novo Relatório</button>
     </div>
 </div>
 
@@ -2588,6 +2836,390 @@ async function consultarCARBackend() {
 }
 
 // Registra o parecer no banco ao gerar (chamado dentro de gerarParecer)
+// ═══════════════════════════════════════════════════════════════
+//  RELATÓRIO DE TRABALHO EM CAMPO
+// ═══════════════════════════════════════════════════════════════
+
+function toggleTelaCampo(){
+    const parecer = document.getElementById('form-container');
+    const campo   = document.getElementById('form-container-campo');
+    const btn     = document.getElementById('btn-toggle-campo');
+    const indoParaCampo = campo.style.display === 'none';
+    parecer.style.display = indoParaCampo ? 'none' : '';
+    campo.style.display   = indoParaCampo ? '' : 'none';
+    btn.innerHTML = indoParaCampo ? '📄 Parecer Técnico' : '🌱 Relatório de Campo';
+}
+
+function toggleCondRC(id, valor){
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle('hidden', valor !== 'Sim');
+}
+
+// ─── Coordenadas UTM (propriedade / área solicitada) ───────────
+function rcAddCoord(tipo){
+    const container = document.getElementById(tipo === 'propriedade' ? 'rc-coords-propriedade' : 'rc-coords-area');
+    const row = document.createElement('div');
+    row.className = 'rc-coord-row';
+    row.innerHTML = `
+        <input type="text" placeholder="Descrição do ponto (ex: P1 - 23L)" class="rc-coord-desc">
+        <input type="text" placeholder="Longitude (ex: 266167m N)" class="rc-coord-long">
+        <input type="text" placeholder="Latitude (ex: 8743906m E)" class="rc-coord-lat">
+        <button type="button" onclick="this.parentElement.remove()">✕</button>
+    `;
+    container.appendChild(row);
+}
+
+function rcColetarCoords(tipo){
+    const container = document.getElementById(tipo === 'propriedade' ? 'rc-coords-propriedade' : 'rc-coords-area');
+    return Array.from(container.querySelectorAll('.rc-coord-row')).map(row => ({
+        desc: row.querySelector('.rc-coord-desc').value.trim(),
+        long: row.querySelector('.rc-coord-long').value.trim(),
+        lat:  row.querySelector('.rc-coord-lat').value.trim(),
+    })).filter(c => c.desc || c.long || c.lat);
+}
+
+// ─── Fotos da vistoria ──────────────────────────────────────────
+let rcFotos = [];
+
+function rcAdicionarFotos(input){
+    const arquivos = Array.from(input.files || []);
+    arquivos.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            rcFotos.push({ dataUrl: e.target.result, legenda: '' });
+            rcRenderFotos();
+        };
+        reader.readAsDataURL(file);
+    });
+    input.value = '';
+}
+
+function rcRemoverFoto(idx){
+    rcFotos.splice(idx, 1);
+    rcRenderFotos();
+}
+
+function rcAtualizarLegenda(idx, texto){
+    if (rcFotos[idx]) rcFotos[idx].legenda = texto;
+}
+
+function rcRenderFotos(){
+    const lista = document.getElementById('rc-fotos-lista');
+    if (!lista) return;
+    lista.innerHTML = rcFotos.map((f, i) => `
+        <div class="rc-foto-card">
+            <img class="rc-thumb" src="${f.dataUrl}" alt="Foto ${i+1}">
+            <div class="rc-foto-campos">
+                <label style="font-size:12.5px;font-weight:700;color:#37474f;">Descrição da Foto ${i+1}:</label>
+                <textarea placeholder="ex: Ponto amostral A11 – detalhe da vegetação inventariada."
+                    oninput="rcAtualizarLegenda(${i}, this.value)">${f.legenda}</textarea>
+                <button type="button" class="rc-foto-remover" onclick="rcRemoverFoto(${i})">🗑 Remover</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ─── Busca SIGAM (Responsável Técnico / Requerente / Processo) ──
+async function consultarSIGAMBackendCampo() {
+    const ano=v('rc_sigam_ano'), orgao=v('rc_sigam_orgao'), seq=v('rc_sigam_seq');
+    const st=document.getElementById('rc_status_busca_sigam');
+    if(!ano||!orgao||!seq){ alert('Preencha Ano, Órgão e Sequencial.'); return; }
+    if(!Session.token){ st.innerText='❌ Sessão expirada. Faça login novamente.'; setTimeout(()=>location.reload(),2000); return; }
+    st.innerText='⏳ Acessando SIGAM → buscando último requerimento e dados do RT... (~40s)';
+    try {
+        const r=await fetchComTimeout(API_BASE+'/api/buscar-sigam', {
+            method:'POST',
+            headers: Session.headers(),
+            body: JSON.stringify({ano, orgao, sequencial:seq}),
+        });
+        if(r.status===401){
+            st.innerText='⏳ Sessão expirada. Reconectando...';
+            const renovado = await renovarSessao();
+            if (renovado) {
+                st.innerText='✅ Reconectado! Repetindo a busca...';
+                await new Promise(res => setTimeout(res, 1000));
+                return consultarSIGAMBackendCampo();
+            }
+            st.innerText='❌ Sessão expirada. Faça login novamente.';
+            setTimeout(() => { Session.limpar(); location.reload(); }, 2000);
+            return;
+        }
+        const d=await r.json();
+        if(d.sucesso){
+            const p=(id,val)=>{ const c=document.getElementById(id); if(c&&val) c.value=val; };
+            p('rc_processo', d.numero_processo);
+            if(d.num_requerimento_doc) p('rc_num_requerimento', d.num_requerimento_doc);
+            else if(d.numero_requerimento) p('rc_num_requerimento', d.numero_requerimento);
+            p('rc_resp_tecnico',     d.resp_tecnico_nome);
+            p('rc_cpf_resp_tecnico', d.resp_tecnico_cpf);
+            p('rc_art',              d.resp_tecnico_registro);
+            if(d.nome_requerente_doc) p('rc_requerente', d.nome_requerente_doc);
+            if(d.cpf_requerente_doc)  p('rc_cpf_requerente', d.cpf_requerente_doc);
+            const reqInfo = d.num_requerimento_doc ? ' | Req: '+d.num_requerimento_doc : '';
+            const preenchidos=[d.resp_tecnico_nome?'RT':'',d.resp_tecnico_cpf?'CPF':''].filter(Boolean).join(', ');
+            st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' '+preenchidos+'.':' ⚠️ RT não localizado.');
+        } else { st.innerText='❌ '+d.mensagem; }
+    } catch(e) { st.innerText='❌ ' + (e.message || 'Erro de conexão com a API.'); }
+}
+
+// ─── Busca CAR (dados do imóvel) ────────────────────────────────
+async function consultarCARBackendCampo() {
+    const car = v('rc_num_car');
+    const st = document.getElementById('rc_status_busca_car');
+    if(!car){ alert('Informe o número do CAR.'); return; }
+    if(!Session.token){ st.innerText='❌ Sessão expirada. Faça login novamente.'; setTimeout(()=>location.reload(),2000); return; }
+    st.innerText='⏳ Buscando dados no SIGCAR...';
+    try {
+        const r = await fetchComTimeout(API_BASE + '/api/buscar-car', {
+            method: 'POST', headers: Session.headers(),
+            body: JSON.stringify({car}),
+        });
+        if(r.status===401){
+            st.innerText='⏳ Sessão expirada. Reconectando...';
+            const renovado = await renovarSessao();
+            if (renovado) {
+                st.innerText='✅ Reconectado! Repetindo a busca...';
+                await new Promise(res => setTimeout(res, 1000));
+                return consultarCARBackendCampo();
+            }
+            st.innerText='❌ Sessão expirada. Faça login novamente.';
+            setTimeout(() => { Session.limpar(); location.reload(); }, 2000);
+            return;
+        }
+        const d = await r.json();
+        if(d.sucesso){
+            st.innerText='✅ Dados do CAR recuperados!';
+            const p=(id,val)=>{ const c=document.getElementById(id); if(c) c.value=val??''; };
+            p('rc_municipio', d.municipio||'');
+            p('rc_nome_imovel', d.nome_imovel || d.denominacao_imovel || '');
+            p('rc_requerente', d.nome_requerente);
+            p('rc_cpf_requerente', d.cpf_requerente);
+            p('rc_area_total', d.area_escriturada || d.area_vetorizada);
+            p('rc_area_rl', d.reserva_legal);
+            p('rc_area_rl_suplementar', d.suplementar);
+            p('rc_area_remanescente', d.remanescente);
+            p('rc_sigcar_numero', car);
+        } else { st.innerText='❌ '+d.mensagem; }
+    } catch(e) { st.innerText='❌ ' + (e.message || 'Erro de conexão com a API.'); }
+}
+
+// ─── Geração do Relatório ───────────────────────────────────────
+function gerarRelatorioCampo(){
+    const numRel      = v('rc_numero_relatorio');
+    const dataRelRaw  = v('rc_data_relatorio');
+    const dataRel     = dataRelRaw ? new Date(dataRelRaw+'T12:00:00').toLocaleDateString('pt-BR') : '';
+    const processo    = v('rc_processo');
+    const numReq       = v('rc_num_requerimento');
+    const requerente   = v('rc_requerente');
+    const cpfReq       = v('rc_cpf_requerente');
+    const atividade    = v('rc_atividade');
+    const municipio    = v('rc_municipio');
+    const respTec      = v('rc_resp_tecnico');
+    const cpfResp      = v('rc_cpf_resp_tecnico');
+    const art          = v('rc_art');
+    const sigcar       = v('rc_sigcar_numero');
+    const nomeImovel   = v('rc_nome_imovel');
+    const ato          = v('rc_ato_administrativo');
+    const areaTotal    = v('rc_area_total');
+    const areaRL       = v('rc_area_rl');
+    const areaRLSup    = v('rc_area_rl_suplementar');
+    const areaRemanesc = v('rc_area_remanescente');
+    const areaSolic    = v('rc_area_solicitacao');
+
+    const dataVistRaw = v('rc_data_vistoria');
+    const dataVist    = dataVistRaw ? new Date(dataVistRaw+'T12:00:00').toLocaleDateString('pt-BR') : '';
+    const depto       = v('rc_departamento');
+    const equipe       = v('rc_equipe');
+
+    const coordsProp = rcColetarCoords('propriedade');
+    const coordsArea = rcColetarCoords('area');
+    const linhasCoord = (coords) => coords.map(c =>
+        `<tr><td>${c.desc}</td><td>${c.long}</td><td>${c.lat}</td></tr>`).join('');
+
+    if(!numRel || !processo){
+        alert('Preencha ao menos o Nº do Relatório e o Processo antes de gerar.');
+        return;
+    }
+
+    const respostas = (id) => v(id);
+
+    const html = `
+<div class="doc-header">
+    <div style="text-align:center;margin-bottom:6pt;">
+        <img src="https://i.ibb.co/jkD5j9L3/Captura-de-tela-2026-04-30-010851.png" style="max-width: 100%; max-height: 250px;" alt="Imagem de Impressão">
+    </div>
+    <p class="parecer-title">RELATÓRIO DE TRABALHO EM CAMPO Nº: ${numRel}</p>
+    <p class="parecer-date">PALMAS, ${dataRel}</p>
+</div>
+
+<div class="section-box">
+    <div class="section-title">DADOS GERAIS</div>
+    <div class="section-body">
+        <table class="dados-table">
+            <tr><td class="lbl">Processo:</td><td><span class="dado-sensivel">${processo}</span></td></tr>
+            <tr><td class="lbl">Nº do Requerimento (SIGAM):</td><td>${numReq}</td></tr>
+            <tr><td class="lbl">Requerente:</td><td><span class="dado-sensivel">${requerente}</span></td></tr>
+            <tr><td class="lbl">CPF/CNPJ:</td><td><span class="dado-sensivel">${cpfReq}</span></td></tr>
+            <tr><td class="lbl">Atividade:</td><td>${atividade}</td></tr>
+            <tr><td class="lbl">Município:</td><td>${municipio}</td></tr>
+            <tr><td class="lbl">Responsável Técnico:</td><td><span class="dado-sensivel">${respTec}</span></td></tr>
+            <tr><td class="lbl">CPF/CNPJ:</td><td><span class="dado-sensivel">${cpfResp}</span></td></tr>
+            <tr><td class="lbl">ART:</td><td>${art}</td></tr>
+            <tr><td class="lbl">SIGCAR TO Nº:</td><td>${sigcar}</td></tr>
+            <tr><td class="lbl">Nome do Imóvel Rural:</td><td><span class="dado-sensivel">${nomeImovel}</span></td></tr>
+            <tr><td class="lbl">Área Total do Imóvel (ha):</td><td>${areaTotal}</td></tr>
+            <tr><td class="lbl">Área de Reserva Legal (ha):</td><td>${areaRL}</td></tr>
+            <tr><td class="lbl">Área de Reserva Legal Suplementar (ha):</td><td>${areaRLSup}</td></tr>
+            <tr><td class="lbl">Área Nativa Remanescente (ha):</td><td>${areaRemanesc}</td></tr>
+            <tr><td class="lbl">Ato Administrativo:</td><td>${ato}</td></tr>
+            <tr><td class="lbl">Área da Solicitação (ha):</td><td>${areaSolic}</td></tr>
+        </table>
+    </div>
+</div>
+
+<div class="section-box">
+    <div class="section-title">DADOS DO RELATÓRIO</div>
+    <div class="section-body">
+        <table class="dados-table">
+            <tr><td class="lbl">Vistoria Realizada em:</td><td>${dataVist}</td></tr>
+            <tr><td class="lbl">Departamento:</td><td>${depto}</td></tr>
+            <tr><td class="lbl">Equipe:</td><td>${equipe}</td></tr>
+        </table>
+        ${coordsProp.length ? `
+        <p><strong>Coordenadas UTM da Propriedade:</strong></p>
+        <table class="dados-table" style="border:1px solid #ccc;">
+            <tr><td class="lbl">Descrição do ponto</td><td class="lbl">Longitude</td><td class="lbl">Latitude</td></tr>
+            ${linhasCoord(coordsProp)}
+        </table>` : ''}
+    </div>
+</div>
+
+<div class="section-box">
+    <div class="section-title">1. CONSIDERAÇÕES GERAIS SOBRE A PROPRIEDADE</div>
+    <div class="section-body">
+        <p><strong>1.1. Qual a atividade principal do imóvel rural?</strong> ${respostas('rc_ativ_principal')}</p>
+        <p><strong>1.2. A atividade possui licenciamento ambiental?</strong> ${respostas('rc_licenciamento')}${v('rc_licenciamento_numero')?' Licença Nº: '+v('rc_licenciamento_numero')+'.':''}</p>
+        <p><strong>1.3. Situado em UC ou zona de amortecimento?</strong> ${respostas('rc_uc')}${v('rc_uc_qual')?' '+v('rc_uc_qual')+'.':''}</p>
+        <p><strong>1.4. Situado em área indígena/quilombola?</strong> ${respostas('rc_indigena')}</p>
+    </div>
+</div>
+
+<div class="section-box">
+    <div class="section-title">2. CONSIDERAÇÕES SOBRE A ÁREA SOLICITADA</div>
+    <div class="section-body">
+        ${coordsArea.length ? `
+        <p><strong>Coordenadas UTM da Área Solicitada:</strong></p>
+        <table class="dados-table" style="border:1px solid #ccc;margin-bottom:8pt;">
+            <tr><td class="lbl">Descrição do ponto</td><td class="lbl">Longitude</td><td class="lbl">Latitude</td></tr>
+            ${linhasCoord(coordsArea)}
+        </table>` : ''}
+        <p><strong>Área de Reserva Legal:</strong></p>
+        <p>A tipologia é representativa da área da propriedade? ${respostas('rc_rl_tipologia')}. ${v('rc_tipologia_desc')}</p>
+        <p>Foi observada alguma alteração? ${respostas('rc_rl_alteracao')}.</p>
+        <p>A reserva legal atende os critérios do art. 14 da Lei 12.651? ${respostas('rc_rl_art14')}.</p>
+        <p>O imóvel possui reserva legal suplementar? ${respostas('rc_rl_suplementar')}.</p>
+        <p><strong>Área de Preservação Permanente:</strong></p>
+        <p>Foi observada alguma alteração? ${respostas('rc_app_alteracao')}.</p>
+        <p>Há necessidade de recomposição? ${respostas('rc_app_recomposicao')}.</p>
+        <p><strong>Relevo:</strong> ${respostas('rc_relevo')}</p>
+        <p><strong>Hidrografia:</strong> ${respostas('rc_hidrografia')}</p>
+        <p><strong>Bacia Hidrográfica:</strong> ${respostas('rc_bacia')}</p>
+        <p>As informações da planta/mapa/croqui correspondem à realidade de campo? ${respostas('rc_croqui_confere')}.</p>
+        <p>Foram observadas as espécies proibidas de corte? ${respostas('rc_especies_proibidas')}.${v('rc_especies_obs')?' Observações: '+v('rc_especies_obs')+'.':''}</p>
+        <p>Existe área subutilizada? ${respostas('rc_area_subutilizada')}.</p>
+        <p>As unidades de amostra foram localizadas (quando for o caso)? ${respostas('rc_amostras_localizadas')}.</p>
+        <p>As espécies florestais citadas no processo correspondem à vistoria? ${respostas('rc_especies_correspondem')}.</p>
+        <p>A tipologia vegetal identificada corresponde à informada pela base fitogeográfica do IBGE? ${respostas('rc_tipologia_ibge')}.${v('rc_tipologia_ibge_desc')?' Observações: '+v('rc_tipologia_ibge_desc')+'.':''}</p>
+    </div>
+</div>
+
+<div class="section-box">
+    <div class="section-title">FINALIZAÇÃO</div>
+    <div class="section-body">
+        <p><strong>Recomendações:</strong></p>
+        ${v('rc_recomendacoes').split('\n').map(l=>l.trim()?`<p>${l.trim()}</p>`:'').join('')}
+        <p><strong>Observações:</strong> ${v('rc_observacoes') || 'Sem observações.'}</p>
+        <p><strong>Parecer Conclusivo?</strong> ${v('rc_conclusivo')}</p>
+        <p><strong>Encaminhamento:</strong> ${v('rc_encaminhamento')}</p>
+    </div>
+</div>
+
+<div class="assinatura">
+    <p style="text-align:center;">
+        _____________________________________________<br>
+        <strong>${v('rc_assinatura1_nome')}</strong><br>
+        ${v('rc_assinatura1_cargo').split('\n').join('<br>')}<br>
+        <em>(Assinado Digitalmente)</em>
+    </p>
+    <br>
+    <p style="text-align:center;">
+        _____________________________________________<br>
+        <strong>${v('rc_assinatura2_nome')}</strong><br>
+        ${v('rc_assinatura2_cargo').split('\n').join('<br>')}<br>
+        <em>(Assinado Digitalmente)</em>
+    </p>
+</div>
+
+${rcFotos.length > 0 ? (() => {
+    const pares = [];
+    for (let i = 0; i < rcFotos.length; i += 2) pares.push(rcFotos.slice(i, i + 2));
+    const linhasHtml = pares.map(par => `
+        <div class="rc-foto-row">
+            ${par.map(f => `
+                <div class="rc-foto-item">
+                    <img src="${f.dataUrl}">
+                    ${f.legenda ? `<div class="rc-foto-legenda">${f.legenda}</div>` : ''}
+                </div>
+            `).join('')}
+            ${par.length === 1 ? '<div class="rc-foto-item" style="border:none;"></div>' : ''}
+        </div>
+    `).join('');
+    return `
+<div class="section-box" style="margin-top:14pt;">
+    <div class="section-title">MATERIAL FOTOGRÁFICO</div>
+    <div class="section-body">
+        <div class="rc-foto-grid">
+            ${linhasHtml}
+        </div>
+    </div>
+</div>`;
+})() : ''}
+`;
+
+    document.getElementById('pdf-content').innerHTML = html;
+    window._ultimoParecerHtml = html;
+    window._ultimoParecerNumero = 'relatorio_campo_' + numRel;
+
+    const barra = document.getElementById('barra-usuario');
+    if (barra) barra.style.display = 'none';
+    window.print();
+    if (barra) barra.style.display = '';
+    mostrarBotaoExportarWord();
+}
+
+function novoRelatorioCampo(){
+    if (!confirm('Isso vai limpar todos os campos do Relatório de Campo. Deseja continuar?')) return;
+
+    document.querySelectorAll('#form-container-campo input[type="text"], #form-container-campo input[type="date"], #form-container-campo input[type="file"]')
+        .forEach(inp => { inp.value = ''; });
+    document.querySelectorAll('#form-container-campo select').forEach(sel => { sel.selectedIndex = 0; });
+    document.querySelectorAll('#form-container-campo textarea').forEach(t => { t.value = ''; });
+
+    document.getElementById('rc-coords-propriedade').innerHTML = '';
+    document.getElementById('rc-coords-area').innerHTML = '';
+    document.querySelectorAll('#form-container-campo .conditional').forEach(el => el.classList.add('hidden'));
+
+    rcFotos = [];
+    rcRenderFotos();
+
+    // Restaura textos padrão
+    document.getElementById('rc_departamento').value = 'Gerência de Controle e Uso dos Recursos Florestais';
+    document.getElementById('rc_recomendacoes').value =
+        '1. É extremamente proibida a coleta, a supressão, o transporte, o armazenamento, o manejo, o beneficiamento e a comercialização das espécies protegidas (imunes), sem a autorização do NATURATINS;\n2. Manter as Áreas de Reserva Legal – ARL e Áreas de Preservação Permanente – APP preservadas, livres de roçadas e queimadas.';
+    document.getElementById('rc_assinatura1_cargo').value = 'Inspetor de Recursos Naturais\nGerência de Controle e Uso dos Recursos Florestais – GEREF';
+    document.getElementById('rc_assinatura2_cargo').value = 'Analista\nGerência de Controle e Uso dos Recursos Florestais – GEREF';
+}
+
 async function registrarParecer(dados) {
     try {
         await fetch(API_BASE + '/api/registrar-parecer', {
