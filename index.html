@@ -2796,6 +2796,7 @@ async function consultarSIGAMBackend() {
             p('titulo_prof',      d.resp_tecnico_formacao);
             p('art_resp_tecnico', d.resp_tecnico_registro);
             if(d.nome_requerente_doc) p('nome_requerente', d.nome_requerente_doc);
+            else if(d.nome_requerente_sigam) p('nome_requerente', d.nome_requerente_sigam);
             if(d.cpf_requerente_doc)  p('cpf_requerente',  d.cpf_requerente_doc);
             else if(d.cpf_requerente_sigam) p('cpf_requerente', d.cpf_requerente_sigam);
             const reqInfo = d.num_requerimento_doc ? ' | Req: '+d.num_requerimento_doc : '';

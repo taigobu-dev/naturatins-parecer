@@ -307,14 +307,21 @@ def _extrair_texto_pdf(conteudo_bytes: bytes) -> str:
         return ""
 
 
-def _extrair_cpf_interessado(html_text: str) -> str:
-    """Busca CPF/CNPJ do proprietário/interessado via atributo title de <span>,
-    padrão: title="CPF: 038.044.131-45\nRESPONSÁVEL: \nE-MAIL: ...".
-    Não depende de posição/índice de tabela — só do texto do atributo title."""
-    m = re.search(r'title="[^"]*CPF:\s*([\d./\-]+)', html_text, re.IGNORECASE)
-    if m:
-        return m.group(1).strip()
-    return ""
+def _extrair_interessado(html_text: str) -> dict:
+    """Busca nome e CPF/CNPJ do proprietário/interessado a partir do <span>
+    com atributo title contendo 'CPF:' — o nome vem do <a> aninhado dentro
+    desse mesmo span (link para interessado_imprimir.asp)."""
+    soup = BeautifulSoup(html_text, "html.parser")
+    for span in soup.find_all("span", title=True):
+        if "CPF:" not in span["title"] and "CNPJ:" not in span["title"]:
+            continue
+        m = re.search(r'(?:CPF|CNPJ):\s*([\d./\-]+)', span["title"], re.IGNORECASE)
+        cpf = m.group(1).strip() if m else ""
+        a = span.find("a")
+        nome = a.get_text(strip=True) if a else ""
+        if cpf or nome:
+            return {"nome": nome, "cpf": cpf}
+    return {}
 
 
 def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0, achados=None):
@@ -339,10 +346,12 @@ def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0, achados=None):
                  len(r.content), r.content[:4])
 
         if not achados.get("cpf_requerente_sigam"):
-            cpf_interessado = _extrair_cpf_interessado(r.text)
-            if cpf_interessado:
-                achados["cpf_requerente_sigam"] = cpf_interessado
-                log.info("CPF do interessado encontrado em cod=%s: %s", cod, cpf_interessado)
+            interessado = _extrair_interessado(r.text)
+            if interessado.get("cpf"):
+                achados["cpf_requerente_sigam"] = interessado["cpf"]
+                achados["nome_requerente_sigam"] = interessado.get("nome", "")
+                log.info("Interessado encontrado em cod=%s: nome=%r cpf=%r",
+                         cod, interessado.get("nome", ""), interessado["cpf"])
 
         # ── PDF direto ───────────────────────────────────────────
         if "pdf" in content_type.lower() or r.content[:4] == b"%PDF":
@@ -534,6 +543,7 @@ def proxy_sigam():
             "resp_tecnico_formacao":  dados_rt.get("rt_titulo", ""),
             "resp_tecnico_registro":  dados_rt.get("rt_art", ""),
             "cpf_requerente_sigam":   achados_interessado.get("cpf_requerente_sigam", ""),
+            "nome_requerente_sigam":  achados_interessado.get("nome_requerente_sigam", ""),
         })
 
     except Exception as exc:
