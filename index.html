@@ -2797,6 +2797,7 @@ async function consultarSIGAMBackend() {
             p('art_resp_tecnico', d.resp_tecnico_registro);
             if(d.nome_requerente_doc) p('nome_requerente', d.nome_requerente_doc);
             if(d.cpf_requerente_doc)  p('cpf_requerente',  d.cpf_requerente_doc);
+            else if(d.cpf_requerente_sigam) p('cpf_requerente', d.cpf_requerente_sigam);
             const reqInfo = d.num_requerimento_doc ? ' | Req: '+d.num_requerimento_doc : '';
             const preenchidos=[d.resp_tecnico_nome?'RT':'',d.resp_tecnico_cpf?'CPF':'',d.resp_tecnico_email?'E-mail':''].filter(Boolean).join(', ');
             st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' '+preenchidos+'.':' ⚠️ RT não localizado.');
@@ -2833,7 +2834,6 @@ async function consultarCARBackend() {
             const p=(id,val)=>{ const c=document.getElementById(id); if(c) c.value=val??''; };
             p('status_car_input',d.status_car); p('q2',d.municipio||'');
             p('nome_imovel', d.nome_imovel || d.denominacao_imovel || ''); p('data_sigcar',d.data_sigcar||'');
-            p('nome_requerente',d.nome_requerente); p('cpf_requerente',d.cpf_requerente);
             p('area_escriturada',d.area_escriturada); p('area_vetorizada',d.area_vetorizada);
             p('area_liquida',d.area_liquida); p('area_remanescente',d.remanescente);
             p('area_pousio',d.pousio); p('area_consolidada',d.consolidada);
