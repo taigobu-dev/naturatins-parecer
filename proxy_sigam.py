@@ -209,50 +209,9 @@ def _sigam_coletar_docs(s, cod_protocolo):
     return candidatos
 
 
-ATIVIDADE_OPCOES = (
-    "Barramento", "Pecuária", "Agricultura", "Silvicultura",
-    "Obras Civis Não Lineares", "Obras Civis Lineares",
-    "Loteamento", "Mineração",
-)
-
-
-def _normalizar_atividade(valor: str) -> str:
-    """Casa o texto extraído do documento (ex.: 'PECUÁRIA') com uma das
-    opções fixas do <select> de Atividade do sistema."""
-    if not valor:
-        return ""
-    v = valor.strip().upper()
-    for opc in ATIVIDADE_OPCOES:
-        if opc.upper() == v or opc.upper() in v or v in opc.upper():
-            return opc
-    return valor.strip().title()
-
-
-def _extrair_atividade_finalidade(body_text):
-    """Extrai a atividade a partir do campo 'Finalidade' do documento,
-    sem confundir com o campo vizinho 'Outras Finalidades'."""
-    if not body_text:
-        return ""
-    for m in re.finditer(r"Finalidade\b", body_text, re.IGNORECASE):
-        idx = m.start()
-        antes = body_text[max(0, idx - 10):idx].strip().upper()
-        if antes.endswith("OUTRAS"):
-            continue
-        trecho = body_text[m.end():]
-        for linha in trecho.splitlines():
-            v = linha.strip().strip(":").strip()
-            if v and v.upper() not in ("FINALIDADE", "OUTRAS FINALIDADES", "") and len(v) > 1:
-                return v
-        break
-    return ""
-
-
 def _extrair_rt_do_texto(body_text):
     if not body_text:
         return {}
-
-    atividade_doc = _normalizar_atividade(_extrair_atividade_finalidade(body_text))
-
     RT_MARCADORES = (
         "RESPONSÁVEL TÉCNICO", "RESPONSAVEL TECNICO",
         "IDENTIFICAÇÃO DO RESPONSÁVEL TÉCNICO",
@@ -262,7 +221,7 @@ def _extrair_rt_do_texto(body_text):
     )
     texto_upper = body_text.upper()
     if not any(m.upper() in texto_upper for m in RT_MARCADORES):
-        return {"atividade_doc": atividade_doc} if atividade_doc else {}
+        return {}
 
     def _linha_apos(marcadores_lista, texto):
         for marc in marcadores_lista:
@@ -329,9 +288,6 @@ def _extrair_rt_do_texto(body_text):
         if m:
             result["num_requerimento_doc"] = m.group(1).strip()
             break
-
-    if atividade_doc:
-        result["atividade_doc"] = atividade_doc
 
     return result
 
@@ -452,48 +408,6 @@ def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0):
     return {}
 
 
-def _buscar_atividade_nos_docs(s, docs):
-    """O campo 'Finalidade' (Atividade) costuma ficar no documento de
-    Autorização/Licença, não no Requerimento onde o RT é identificado —
-    por isso, quando a varredura normal não encontra a atividade junto
-    com o RT, procura especificamente por ela nos demais documentos.
-    Tenta as mesmas URLs que _sigam_extrair_rt usa (documento e processo),
-    já que a URL de listagem sozinha não traz o conteúdo do documento."""
-    for texto, _url_listagem, cp in docs:
-        for url in [
-            f"{SIGAM_BASE}/protocolo/impressao.asp?cod_protocolo={cp}&area=documento",
-            f"{SIGAM_BASE}/protocolo/impressao_processo.asp?cod_protocolo={cp}&area=processo",
-        ]:
-            try:
-                r = s.get(url, timeout=60)
-            except Exception as e:
-                log.warning("Erro ao buscar doc cp=%s (%s) para atividade: %s", cp, url, e)
-                continue
-            content_type = r.headers.get("Content-Type", "")
-            if "pdf" in content_type.lower() or r.content[:4] == b"%PDF":
-                texto_doc = _extrair_texto_pdf(r.content)
-            else:
-                texto_doc = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
-            atv = _extrair_atividade_finalidade(texto_doc)
-            if atv:
-                log.info("Atividade encontrada em cod=%s (doc=%r): %s", cp, texto[:30], atv)
-                return _normalizar_atividade(atv)
-
-        # Tenta também o endpoint de download direto de PDF
-        pdf_url = f"{SIGAM_BASE}/x64/impressao/protocolo_arquivo_download.aspx?cod_protocolo={cp}&txt_area=documento"
-        try:
-            rp = s.get(pdf_url, timeout=60)
-            if rp.content[:4] == b"%PDF":
-                texto_doc = _extrair_texto_pdf(rp.content)
-                atv = _extrair_atividade_finalidade(texto_doc)
-                if atv:
-                    log.info("Atividade encontrada via download cod=%s: %s", cp, atv)
-                    return _normalizar_atividade(atv)
-        except Exception as e:
-            log.warning("Erro download PDF cod=%s para atividade: %s", cp, e)
-    return ""
-
-
 # ══════════════════════════════════════════════════════════════════
 #  ROTAS DO PROXY
 # ══════════════════════════════════════════════════════════════════
@@ -587,18 +501,6 @@ def proxy_sigam():
                     dados_rt["num_requerimento_doc"] = m3.group(1).strip()
                     break
 
-        # A "Finalidade" (Atividade) geralmente está num documento de
-        # Autorização/Licença diferente do Requerimento onde o RT foi
-        # encontrado — se não veio junto, procura especificamente por ela
-        # nos demais documentos (os que não são requerimento primeiro).
-        if not dados_rt.get("atividade_doc"):
-            nao_requerimento = [(t, u, cp) for t, u, cp in todos_docs
-                                 if "REQUERIMENTO" not in t.upper()]
-            ordem_busca = list(reversed(nao_requerimento)) + list(reversed(requerimentos))
-            atv = _buscar_atividade_nos_docs(s, ordem_busca)
-            if atv:
-                dados_rt["atividade_doc"] = atv
-
         log.info("SIGAM OK: proc=%s RT=%s", numero_processo, dados_rt)
         return jsonify({
             "sucesso":             True,
@@ -611,7 +513,6 @@ def proxy_sigam():
             "resp_tecnico_tel":       dados_rt.get("rt_telefone", ""),
             "resp_tecnico_formacao":  dados_rt.get("rt_titulo", ""),
             "resp_tecnico_registro":  dados_rt.get("rt_art", ""),
-            "atividade_doc":          dados_rt.get("atividade_doc", ""),
         })
 
     except Exception as exc:

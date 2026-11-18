@@ -1,0 +1,23 @@
+# Segredos — nunca versionar
+.env
+*.env
+COMANDO_PARA_RODAR_O_PYTHON.txt
+
+# Binários locais
+ngrok.exe
+*.exe
+
+# Scripts de uso local que não fazem parte do deploy
+iniciar_proxy.py
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Banco local de desenvolvimento
+*.db
+naturatins_dev.db
+
+env.ps1
