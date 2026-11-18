@@ -630,9 +630,9 @@
     <div class="search-box-sigam">
         <label>🔍 Buscar Dados do Processo (SIGAM):</label>
         <div class="search-row" style="margin-top:8px;">
-            <input type="text" id="sigam_ano" placeholder="Ano" style="width:18%;">
-            <input type="text" id="sigam_orgao" placeholder="Órgão" style="width:18%;">
-            <input type="text" id="sigam_seq" placeholder="Nº Sequencial" style="width:36%;">
+            <input type="text" id="sigam_ano" placeholder="Ano" style="width:18%;" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarSIGAMBackend();}">
+            <input type="text" id="sigam_orgao" placeholder="Órgão" style="width:18%;" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarSIGAMBackend();}">
+            <input type="text" id="sigam_seq" placeholder="Nº Sequencial" style="width:36%;" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarSIGAMBackend();}">
             <button class="btn-search-sigam" onclick="consultarSIGAMBackend()">Buscar SIGAM</button>
         </div>
         <small id="status_busca_sigam" style="color:#00838f;"></small>
@@ -714,7 +714,7 @@
     <div class="search-box">
         <label>🔍 Número do CAR para busca automática (SIGCAR):</label>
         <div class="search-row" style="margin-top:8px;">
-            <input type="text" id="q5_num" class="dado-sensivel" placeholder="Ex: TO-1234567-...">
+            <input type="text" id="q5_num" class="dado-sensivel" placeholder="Ex: TO-1234567-..." onkeydown="if(event.key==='Enter'){event.preventDefault();consultarCARBackend();}">
             <button class="btn-search" onclick="consultarCARBackend()">Buscar CAR</button>
         </div>
         <small id="status_busca" style="color:var(--secondary);"></small>
@@ -1130,9 +1130,9 @@
     <div class="search-box-sigam">
         <label>🔍 Buscar Dados do Processo (SIGAM):</label>
         <div class="search-row" style="margin-top:8px;">
-            <input type="text" id="rc_sigam_ano" placeholder="Ano" style="width:18%;">
-            <input type="text" id="rc_sigam_orgao" placeholder="Órgão" style="width:18%;">
-            <input type="text" id="rc_sigam_seq" placeholder="Nº Sequencial" style="width:36%;">
+            <input type="text" id="rc_sigam_ano" placeholder="Ano" style="width:18%;" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarSIGAMBackendCampo();}">
+            <input type="text" id="rc_sigam_orgao" placeholder="Órgão" style="width:18%;" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarSIGAMBackendCampo();}">
+            <input type="text" id="rc_sigam_seq" placeholder="Nº Sequencial" style="width:36%;" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarSIGAMBackendCampo();}">
             <button class="btn-search-sigam" onclick="consultarSIGAMBackendCampo()">Buscar SIGAM</button>
         </div>
         <small id="rc_status_busca_sigam" style="color:#00838f;"></small>
@@ -1141,7 +1141,7 @@
     <div class="search-box">
         <label>🔍 Número do CAR para busca automática (SIGCAR):</label>
         <div class="search-row" style="margin-top:8px;">
-            <input type="text" id="rc_num_car" class="dado-sensivel" placeholder="Ex: TO-1234567-...">
+            <input type="text" id="rc_num_car" class="dado-sensivel" placeholder="Ex: TO-1234567-..." onkeydown="if(event.key==='Enter'){event.preventDefault();consultarCARBackendCampo();}">
             <button class="btn-search" onclick="consultarCARBackendCampo()">Buscar CAR</button>
         </div>
         <small id="rc_status_busca_car" style="color:var(--secondary);"></small>
