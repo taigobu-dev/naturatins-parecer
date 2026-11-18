@@ -456,22 +456,41 @@ def _buscar_atividade_nos_docs(s, docs):
     """O campo 'Finalidade' (Atividade) costuma ficar no documento de
     Autorização/Licença, não no Requerimento onde o RT é identificado —
     por isso, quando a varredura normal não encontra a atividade junto
-    com o RT, procura especificamente por ela nos demais documentos."""
-    for texto, url, cp in docs:
+    com o RT, procura especificamente por ela nos demais documentos.
+    Tenta as mesmas URLs que _sigam_extrair_rt usa (documento e processo),
+    já que a URL de listagem sozinha não traz o conteúdo do documento."""
+    for texto, _url_listagem, cp in docs:
+        for url in [
+            f"{SIGAM_BASE}/protocolo/impressao.asp?cod_protocolo={cp}&area=documento",
+            f"{SIGAM_BASE}/protocolo/impressao_processo.asp?cod_protocolo={cp}&area=processo",
+        ]:
+            try:
+                r = s.get(url, timeout=60)
+            except Exception as e:
+                log.warning("Erro ao buscar doc cp=%s (%s) para atividade: %s", cp, url, e)
+                continue
+            content_type = r.headers.get("Content-Type", "")
+            if "pdf" in content_type.lower() or r.content[:4] == b"%PDF":
+                texto_doc = _extrair_texto_pdf(r.content)
+            else:
+                texto_doc = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
+            atv = _extrair_atividade_finalidade(texto_doc)
+            if atv:
+                log.info("Atividade encontrada em cod=%s (doc=%r): %s", cp, texto[:30], atv)
+                return _normalizar_atividade(atv)
+
+        # Tenta também o endpoint de download direto de PDF
+        pdf_url = f"{SIGAM_BASE}/x64/impressao/protocolo_arquivo_download.aspx?cod_protocolo={cp}&txt_area=documento"
         try:
-            r = s.get(url, timeout=60)
+            rp = s.get(pdf_url, timeout=60)
+            if rp.content[:4] == b"%PDF":
+                texto_doc = _extrair_texto_pdf(rp.content)
+                atv = _extrair_atividade_finalidade(texto_doc)
+                if atv:
+                    log.info("Atividade encontrada via download cod=%s: %s", cp, atv)
+                    return _normalizar_atividade(atv)
         except Exception as e:
-            log.warning("Erro ao buscar doc cp=%s para atividade: %s", cp, e)
-            continue
-        content_type = r.headers.get("Content-Type", "")
-        if "pdf" in content_type.lower() or r.content[:4] == b"%PDF":
-            texto_doc = _extrair_texto_pdf(r.content)
-        else:
-            texto_doc = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
-        atv = _extrair_atividade_finalidade(texto_doc)
-        if atv:
-            log.info("Atividade encontrada em cod=%s texto_doc_marc=%r: %s", cp, texto[:30], atv)
-            return _normalizar_atividade(atv)
+            log.warning("Erro download PDF cod=%s para atividade: %s", cp, e)
     return ""
 
 
