@@ -2797,18 +2797,8 @@ async function consultarSIGAMBackend() {
             p('art_resp_tecnico', d.resp_tecnico_registro);
             if(d.nome_requerente_doc) p('nome_requerente', d.nome_requerente_doc);
             if(d.cpf_requerente_doc)  p('cpf_requerente',  d.cpf_requerente_doc);
-            if(d.atividade_doc){
-                const selAtv = document.getElementById('atividade');
-                const norm = s => (s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
-                const alvo = norm(d.atividade_doc);
-                const opcao = Array.from(selAtv.options).find(o => {
-                    const ov = norm(o.value);
-                    return ov && (ov === alvo || ov.includes(alvo) || alvo.includes(ov));
-                });
-                if(opcao) selAtv.value = opcao.value;
-            }
             const reqInfo = d.num_requerimento_doc ? ' | Req: '+d.num_requerimento_doc : '';
-            const preenchidos=[d.resp_tecnico_nome?'RT':'',d.resp_tecnico_cpf?'CPF':'',d.resp_tecnico_email?'E-mail':'',d.atividade_doc?'Atividade':''].filter(Boolean).join(', ');
+            const preenchidos=[d.resp_tecnico_nome?'RT':'',d.resp_tecnico_cpf?'CPF':'',d.resp_tecnico_email?'E-mail':''].filter(Boolean).join(', ');
             st.innerText='✅ Processo preenchido'+reqInfo+'.'+(preenchidos?' '+preenchidos+'.':' ⚠️ RT não localizado.');
         } else { st.innerText='❌ '+d.mensagem; }
     } catch(e) { st.innerText='❌ ' + (e.message || 'Erro de conexão com a API.'); }

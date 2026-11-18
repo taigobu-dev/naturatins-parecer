@@ -854,76 +854,15 @@ def _sigam_extrair_rt(s: req.Session, cod: str, cod_protocolo: str, visitados: s
     return {}
 
 
-ATIVIDADE_OPCOES = (
-    "Barramento", "Pecuária", "Agricultura", "Silvicultura",
-    "Obras Civis Não Lineares", "Obras Civis Lineares",
-    "Loteamento", "Mineração",
-)
-
-
-def _normalizar_atividade(valor: str) -> str:
-    """Casa o texto extraído do documento (ex.: 'PECUÁRIA') com uma das
-    opções fixas do <select> de Atividade do sistema."""
-    if not valor:
-        return ""
-    v = valor.strip().upper()
-    for opc in ATIVIDADE_OPCOES:
-        if opc.upper() == v or opc.upper() in v or v in opc.upper():
-            return opc
-    return valor.strip().title()
-
-
-def _buscar_atividade_nos_docs(s: "req.Session", docs: list) -> str:
-    """O campo 'Finalidade' (Atividade) costuma ficar no documento de
-    Autorização/Licença, não no Requerimento onde o RT é identificado —
-    por isso, quando a varredura normal não encontra a atividade junto
-    com o RT, procura especificamente por ela nos demais documentos."""
-    for texto, url, cp in docs:
-        try:
-            r = s.get(url, timeout=30)
-        except Exception as e:
-            log.warning("Erro ao buscar doc cp=%s para atividade: %s", cp, e)
-            continue
-        texto_doc = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
-        atv = _extrair_atividade_finalidade(texto_doc)
-        if atv:
-            log.info("Atividade encontrada em cod=%s: %s", cp, atv)
-            return _normalizar_atividade(atv)
-    return ""
-
-
-def _extrair_atividade_finalidade(body_text: str) -> str:
-    """Extrai a atividade a partir do campo 'Finalidade' do documento
-    (ex.: certidão/ficha com 'Dados do enquadramento'), tomando cuidado
-    para não confundir com o campo vizinho 'Outras Finalidades'."""
-    if not body_text:
-        return ""
-    for m in re.finditer(r"Finalidade\b", body_text, re.IGNORECASE):
-        idx = m.start()
-        antes = body_text[max(0, idx - 10):idx].strip().upper()
-        if antes.endswith("OUTRAS"):
-            continue
-        trecho = body_text[m.end():]
-        for linha in trecho.splitlines():
-            v = linha.strip().strip(":").strip()
-            if v and v.upper() not in ("FINALIDADE", "OUTRAS FINALIDADES", "") and len(v) > 1:
-                return v
-        break
-    return ""
-
-
 def _extrair_rt_do_texto(body_text: str) -> dict:
     if not body_text:
         return {}
-
-    atividade_doc = _normalizar_atividade(_extrair_atividade_finalidade(body_text))
-
     RT_MARCADORES = (
         "RESPONSÁVEL TÉCNICO", "RESPONSAVEL TECNICO",
         "IDENTIFICAÇÃO DO RESPONSÁVEL TÉCNICO",
     )
     if not any(m in body_text.upper() for m in RT_MARCADORES):
-        return {"atividade_doc": atividade_doc} if atividade_doc else {}
+        return {}
 
     def _linha_apos(marcador: str, texto: str) -> str:
         idx = texto.find(marcador)
@@ -1009,7 +948,6 @@ def _extrair_rt_do_texto(body_text: str) -> dict:
     if num_req:  resultado["num_requerimento_doc"] = num_req
     if nome_req: resultado["nome_requerente_doc"]  = nome_req
     if cpf_req:  resultado["cpf_requerente_doc"]   = cpf_req
-    if atividade_doc: resultado["atividade_doc"]   = atividade_doc
     return resultado
 
 
@@ -1381,15 +1319,6 @@ def buscar_sigam():
                 if m3:
                     dados_rt["num_requerimento_doc"] = m3.group(1).strip()
                     break
-
-        # A "Finalidade" (Atividade) geralmente está num documento de
-        # Autorização/Licença diferente do Requerimento onde o RT foi
-        # encontrado — se não veio junto, procura especificamente por ela
-        # nos demais documentos.
-        if not dados_rt.get("atividade_doc") and docs:
-            atv = _buscar_atividade_nos_docs(s, list(reversed(docs)))
-            if atv:
-                dados_rt["atividade_doc"] = atv
 
         log.info("SIGAM OK: proc=%s RT=%s", numero_processo, bool(dados_rt))
         return jsonify({
