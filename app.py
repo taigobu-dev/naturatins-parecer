@@ -854,15 +854,57 @@ def _sigam_extrair_rt(s: req.Session, cod: str, cod_protocolo: str, visitados: s
     return {}
 
 
+ATIVIDADE_OPCOES = (
+    "Barramento", "Pecuária", "Agricultura", "Silvicultura",
+    "Obras Civis Não Lineares", "Obras Civis Lineares",
+    "Loteamento", "Mineração",
+)
+
+
+def _normalizar_atividade(valor: str) -> str:
+    """Casa o texto extraído do documento (ex.: 'PECUÁRIA') com uma das
+    opções fixas do <select> de Atividade do sistema."""
+    if not valor:
+        return ""
+    v = valor.strip().upper()
+    for opc in ATIVIDADE_OPCOES:
+        if opc.upper() == v or opc.upper() in v or v in opc.upper():
+            return opc
+    return valor.strip().title()
+
+
+def _extrair_atividade_finalidade(body_text: str) -> str:
+    """Extrai a atividade a partir do campo 'Finalidade' do documento
+    (ex.: certidão/ficha com 'Dados do enquadramento'), tomando cuidado
+    para não confundir com o campo vizinho 'Outras Finalidades'."""
+    if not body_text:
+        return ""
+    for m in re.finditer(r"Finalidade\b", body_text, re.IGNORECASE):
+        idx = m.start()
+        antes = body_text[max(0, idx - 10):idx].strip().upper()
+        if antes.endswith("OUTRAS"):
+            continue
+        trecho = body_text[m.end():]
+        for linha in trecho.splitlines():
+            v = linha.strip().strip(":").strip()
+            if v and v.upper() not in ("FINALIDADE", "OUTRAS FINALIDADES", "") and len(v) > 1:
+                return v
+        break
+    return ""
+
+
 def _extrair_rt_do_texto(body_text: str) -> dict:
     if not body_text:
         return {}
+
+    atividade_doc = _normalizar_atividade(_extrair_atividade_finalidade(body_text))
+
     RT_MARCADORES = (
         "RESPONSÁVEL TÉCNICO", "RESPONSAVEL TECNICO",
         "IDENTIFICAÇÃO DO RESPONSÁVEL TÉCNICO",
     )
     if not any(m in body_text.upper() for m in RT_MARCADORES):
-        return {}
+        return {"atividade_doc": atividade_doc} if atividade_doc else {}
 
     def _linha_apos(marcador: str, texto: str) -> str:
         idx = texto.find(marcador)
@@ -948,6 +990,7 @@ def _extrair_rt_do_texto(body_text: str) -> dict:
     if num_req:  resultado["num_requerimento_doc"] = num_req
     if nome_req: resultado["nome_requerente_doc"]  = nome_req
     if cpf_req:  resultado["cpf_requerente_doc"]   = cpf_req
+    if atividade_doc: resultado["atividade_doc"]   = atividade_doc
     return resultado
 
 

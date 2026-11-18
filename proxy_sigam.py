@@ -209,9 +209,50 @@ def _sigam_coletar_docs(s, cod_protocolo):
     return candidatos
 
 
+ATIVIDADE_OPCOES = (
+    "Barramento", "Pecuária", "Agricultura", "Silvicultura",
+    "Obras Civis Não Lineares", "Obras Civis Lineares",
+    "Loteamento", "Mineração",
+)
+
+
+def _normalizar_atividade(valor: str) -> str:
+    """Casa o texto extraído do documento (ex.: 'PECUÁRIA') com uma das
+    opções fixas do <select> de Atividade do sistema."""
+    if not valor:
+        return ""
+    v = valor.strip().upper()
+    for opc in ATIVIDADE_OPCOES:
+        if opc.upper() == v or opc.upper() in v or v in opc.upper():
+            return opc
+    return valor.strip().title()
+
+
+def _extrair_atividade_finalidade(body_text):
+    """Extrai a atividade a partir do campo 'Finalidade' do documento,
+    sem confundir com o campo vizinho 'Outras Finalidades'."""
+    if not body_text:
+        return ""
+    for m in re.finditer(r"Finalidade\b", body_text, re.IGNORECASE):
+        idx = m.start()
+        antes = body_text[max(0, idx - 10):idx].strip().upper()
+        if antes.endswith("OUTRAS"):
+            continue
+        trecho = body_text[m.end():]
+        for linha in trecho.splitlines():
+            v = linha.strip().strip(":").strip()
+            if v and v.upper() not in ("FINALIDADE", "OUTRAS FINALIDADES", "") and len(v) > 1:
+                return v
+        break
+    return ""
+
+
 def _extrair_rt_do_texto(body_text):
     if not body_text:
         return {}
+
+    atividade_doc = _normalizar_atividade(_extrair_atividade_finalidade(body_text))
+
     RT_MARCADORES = (
         "RESPONSÁVEL TÉCNICO", "RESPONSAVEL TECNICO",
         "IDENTIFICAÇÃO DO RESPONSÁVEL TÉCNICO",
@@ -221,7 +262,7 @@ def _extrair_rt_do_texto(body_text):
     )
     texto_upper = body_text.upper()
     if not any(m.upper() in texto_upper for m in RT_MARCADORES):
-        return {}
+        return {"atividade_doc": atividade_doc} if atividade_doc else {}
 
     def _linha_apos(marcadores_lista, texto):
         for marc in marcadores_lista:
@@ -289,6 +330,9 @@ def _extrair_rt_do_texto(body_text):
             result["num_requerimento_doc"] = m.group(1).strip()
             break
 
+    if atividade_doc:
+        result["atividade_doc"] = atividade_doc
+
     return result
 
 
@@ -307,32 +351,13 @@ def _extrair_texto_pdf(conteudo_bytes: bytes) -> str:
         return ""
 
 
-def _extrair_interessado(html_text: str) -> dict:
-    """Busca nome e CPF/CNPJ do proprietário/interessado a partir do <span>
-    com atributo title contendo 'CPF:' — o nome vem do <a> aninhado dentro
-    desse mesmo span (link para interessado_imprimir.asp)."""
-    soup = BeautifulSoup(html_text, "html.parser")
-    for span in soup.find_all("span", title=True):
-        if "CPF:" not in span["title"] and "CNPJ:" not in span["title"]:
-            continue
-        m = re.search(r'(?:CPF|CNPJ):\s*([\d./\-]+)', span["title"], re.IGNORECASE)
-        cpf = m.group(1).strip() if m else ""
-        a = span.find("a")
-        nome = a.get_text(strip=True) if a else ""
-        if cpf or nome:
-            return {"nome": nome, "cpf": cpf}
-    return {}
-
-
-def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0, achados=None):
+def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0):
     ACOES = ("alterar.asp","assinar.asp","cancelar.asp","distribuir.asp",
              "movimentar.asp","comentar.asp","vincular.asp","pendencia.asp",
              "responder.asp","enquadramento.asp","arquivar.asp")
     if not cod or nivel > 3 or cod in visitados:
         return {}
     visitados.add(cod)
-    if achados is None:
-        achados = {}
 
     for url in [
         f"{SIGAM_BASE}/protocolo/impressao.asp?cod_protocolo={cod}&area=documento",
@@ -344,14 +369,6 @@ def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0, achados=None):
                  cod, url.split("?")[0].split("/")[-1],
                  r.status_code, content_type[:40],
                  len(r.content), r.content[:4])
-
-        if not achados.get("cpf_requerente_sigam"):
-            interessado = _extrair_interessado(r.text)
-            if interessado.get("cpf"):
-                achados["cpf_requerente_sigam"] = interessado["cpf"]
-                achados["nome_requerente_sigam"] = interessado.get("nome", "")
-                log.info("Interessado encontrado em cod=%s: nome=%r cpf=%r",
-                         cod, interessado.get("nome", ""), interessado["cpf"])
 
         # ── PDF direto ───────────────────────────────────────────
         if "pdf" in content_type.lower() or r.content[:4] == b"%PDF":
@@ -428,7 +445,7 @@ def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0, achados=None):
             filhos.append(cf)
 
         for cf in reversed(filhos):
-            rt = _sigam_extrair_rt(s, cf, cod_protocolo, visitados, nivel + 1, achados)
+            rt = _sigam_extrair_rt(s, cf, cod_protocolo, visitados, nivel + 1)
             if rt:
                 return rt
 
@@ -494,12 +511,11 @@ def proxy_sigam():
         # Busca RT no ÚLTIMO requerimento (mais recente)
         visitados = set()
         dados_rt  = {}
-        achados_interessado = {}
 
         if requerimentos:
             for texto, url, cp in reversed(requerimentos):
                 log.info("Tentando RT no REQUERIMENTO cp=%s texto=%s", cp, texto)
-                dados_rt = _sigam_extrair_rt(s, cp, cod_protocolo, visitados, achados=achados_interessado)
+                dados_rt = _sigam_extrair_rt(s, cp, cod_protocolo, visitados)
                 if dados_rt:
                     break
 
@@ -509,7 +525,7 @@ def proxy_sigam():
             for texto, url, cp in reversed(todos_docs):
                 if cp not in visitados:
                     log.info("Tentando RT em doc cp=%s texto=%s", cp, texto[:30])
-                    dados_rt = _sigam_extrair_rt(s, cp, cod_protocolo, visitados, achados=achados_interessado)
+                    dados_rt = _sigam_extrair_rt(s, cp, cod_protocolo, visitados)
                     if dados_rt:
                         break
 
@@ -529,8 +545,7 @@ def proxy_sigam():
                     dados_rt["num_requerimento_doc"] = m3.group(1).strip()
                     break
 
-        log.info("SIGAM OK: proc=%s RT=%s | CPF interessado=%s",
-                 numero_processo, dados_rt, achados_interessado.get("cpf_requerente_sigam", ""))
+        log.info("SIGAM OK: proc=%s RT=%s", numero_processo, dados_rt)
         return jsonify({
             "sucesso":             True,
             "numero_processo":     numero_processo,
@@ -542,8 +557,7 @@ def proxy_sigam():
             "resp_tecnico_tel":       dados_rt.get("rt_telefone", ""),
             "resp_tecnico_formacao":  dados_rt.get("rt_titulo", ""),
             "resp_tecnico_registro":  dados_rt.get("rt_art", ""),
-            "cpf_requerente_sigam":   achados_interessado.get("cpf_requerente_sigam", ""),
-            "nome_requerente_sigam":  achados_interessado.get("nome_requerente_sigam", ""),
+            "atividade_doc":          dados_rt.get("atividade_doc", ""),
         })
 
     except Exception as exc:
