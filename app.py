@@ -873,6 +873,25 @@ def _normalizar_atividade(valor: str) -> str:
     return valor.strip().title()
 
 
+def _buscar_atividade_nos_docs(s: "req.Session", docs: list) -> str:
+    """O campo 'Finalidade' (Atividade) costuma ficar no documento de
+    Autorização/Licença, não no Requerimento onde o RT é identificado —
+    por isso, quando a varredura normal não encontra a atividade junto
+    com o RT, procura especificamente por ela nos demais documentos."""
+    for texto, url, cp in docs:
+        try:
+            r = s.get(url, timeout=30)
+        except Exception as e:
+            log.warning("Erro ao buscar doc cp=%s para atividade: %s", cp, e)
+            continue
+        texto_doc = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
+        atv = _extrair_atividade_finalidade(texto_doc)
+        if atv:
+            log.info("Atividade encontrada em cod=%s: %s", cp, atv)
+            return _normalizar_atividade(atv)
+    return ""
+
+
 def _extrair_atividade_finalidade(body_text: str) -> str:
     """Extrai a atividade a partir do campo 'Finalidade' do documento
     (ex.: certidão/ficha com 'Dados do enquadramento'), tomando cuidado
@@ -1362,6 +1381,15 @@ def buscar_sigam():
                 if m3:
                     dados_rt["num_requerimento_doc"] = m3.group(1).strip()
                     break
+
+        # A "Finalidade" (Atividade) geralmente está num documento de
+        # Autorização/Licença diferente do Requerimento onde o RT foi
+        # encontrado — se não veio junto, procura especificamente por ela
+        # nos demais documentos.
+        if not dados_rt.get("atividade_doc") and docs:
+            atv = _buscar_atividade_nos_docs(s, list(reversed(docs)))
+            if atv:
+                dados_rt["atividade_doc"] = atv
 
         log.info("SIGAM OK: proc=%s RT=%s", numero_processo, bool(dados_rt))
         return jsonify({

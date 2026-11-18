@@ -452,6 +452,29 @@ def _sigam_extrair_rt(s, cod, cod_protocolo, visitados, nivel=0):
     return {}
 
 
+def _buscar_atividade_nos_docs(s, docs):
+    """O campo 'Finalidade' (Atividade) costuma ficar no documento de
+    Autorização/Licença, não no Requerimento onde o RT é identificado —
+    por isso, quando a varredura normal não encontra a atividade junto
+    com o RT, procura especificamente por ela nos demais documentos."""
+    for texto, url, cp in docs:
+        try:
+            r = s.get(url, timeout=60)
+        except Exception as e:
+            log.warning("Erro ao buscar doc cp=%s para atividade: %s", cp, e)
+            continue
+        content_type = r.headers.get("Content-Type", "")
+        if "pdf" in content_type.lower() or r.content[:4] == b"%PDF":
+            texto_doc = _extrair_texto_pdf(r.content)
+        else:
+            texto_doc = BeautifulSoup(r.text, "html.parser").get_text(separator="\n", strip=True)
+        atv = _extrair_atividade_finalidade(texto_doc)
+        if atv:
+            log.info("Atividade encontrada em cod=%s texto_doc_marc=%r: %s", cp, texto[:30], atv)
+            return _normalizar_atividade(atv)
+    return ""
+
+
 # ══════════════════════════════════════════════════════════════════
 #  ROTAS DO PROXY
 # ══════════════════════════════════════════════════════════════════
@@ -544,6 +567,18 @@ def proxy_sigam():
                 if m3:
                     dados_rt["num_requerimento_doc"] = m3.group(1).strip()
                     break
+
+        # A "Finalidade" (Atividade) geralmente está num documento de
+        # Autorização/Licença diferente do Requerimento onde o RT foi
+        # encontrado — se não veio junto, procura especificamente por ela
+        # nos demais documentos (os que não são requerimento primeiro).
+        if not dados_rt.get("atividade_doc"):
+            nao_requerimento = [(t, u, cp) for t, u, cp in todos_docs
+                                 if "REQUERIMENTO" not in t.upper()]
+            ordem_busca = list(reversed(nao_requerimento)) + list(reversed(requerimentos))
+            atv = _buscar_atividade_nos_docs(s, ordem_busca)
+            if atv:
+                dados_rt["atividade_doc"] = atv
 
         log.info("SIGAM OK: proc=%s RT=%s", numero_processo, dados_rt)
         return jsonify({
